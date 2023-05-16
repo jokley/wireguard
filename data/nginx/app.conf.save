@@ -1,0 +1,53 @@
+server {
+    listen 80;
+    server_name .pi.jokley.at;
+    location /.well-known/acme-challenge/ { 
+        root /var/www/certbot;                  
+    }                                           
+    location / {
+        root /var/www/root;
+    }
+}
+server {
+    listen 443 ssl;
+    server_name pi.jokley.at;
+    
+    location / {
+        proxy_pass http://wg-easy:51821/;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "Upgrade";
+        proxy_set_header Host $host;
+    }
+
+
+    ssl_certificate /etc/letsencrypt/live/pi.jokley.at/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/pi.jokley.at/privkey.pem;
+    
+#    include /etc/letsencrypt/options-ssl-nginx.conf;    
+#    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+}
+
+server {
+    listen 443 ssl;
+    server_name me.pi.jokley.at;
+
+    location / {
+         root /var/www/root;
+#    }
+
+    location / {
+        proxy_pass http://10.8.0.2/;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "Upgrade";
+        proxy_set_header Host $host;
+    }
+
+
+    ssl_certificate /etc/letsencrypt/live/pi.jokley.at/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/pi.jokley.at/privkey.pem;
+
+#    include /etc/letsencrypt/options-ssl-nginx.conf;
+#    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+}
