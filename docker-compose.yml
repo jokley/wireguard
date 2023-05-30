@@ -4,11 +4,11 @@ services:
     environment:
       - WG_HOST=pi.jokley.at
       - PASSWORD=jokley82@wireguard
-      #- WG_DEFAULT_ADDRESS=192.0.0.x
-      #- WG_DEFAULT_DNS=4.4.4.4, 8.8.4.4
+      - WG_DEFAULT_ADDRESS=100.64.0.x
+      - WG_DEFAULT_DNS=""
       #- WG_MTU=1420
       - WG_PERSISTENT_KEEPALIVE=25
-      #- WG_ALLOWED_IPS=10.8.0.2/24
+      - WG_ALLOWED_IPS=100.64.0.1/32
     image: weejewel/wg-easy
     container_name: wg-easy
     hostname: wg-easy
