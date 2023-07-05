@@ -8,7 +8,7 @@ fi
 domains=(me.pi.jokley.at www.me.pi.jokley.at)
 rsa_key_size=4096
 data_path="./data/certbot"
-email="reinhard_juen@vol.at"
+email="donald_duck@vol.at"
 staging=0 # Set to 1 if you're testing your setup to avoid hitting request limits
 
 if [ -d "$data_path" ]; then
