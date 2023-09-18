@@ -20,6 +20,7 @@ services:
       - "80:80"
       - "443:443"
       - "8080:8080"
+      - "1883:1883"
     restart: unless-stopped
     cap_add:
       - NET_ADMIN
