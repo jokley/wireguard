@@ -36,7 +36,7 @@ services:
 #      - "443:443"
     restart: unless-stopped                                     
     volumes:
-      - ./data/nginx:/etc/nginx/conf.d:ro
+      - ./data/nginx:/etc/nginx/conf:ro
       - ./data/wwwroot:/var/www/root:ro
       - ./data/certbot/conf:/etc/letsencrypt:ro       
       - ./data/certbot/www:/var/www/certbot:ro 
