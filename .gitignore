@@ -1,2 +1,2 @@
 /data/certbot/conf/
-.htpasswd
+.htpasswd*
