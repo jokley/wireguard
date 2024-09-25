@@ -5,7 +5,7 @@ if ! [ -x "$(command -v docker-compose)" ]; then
   exit 1
 fi
 
-domains=(disti.pi.jokley.at www.disti.pi.jokley.at)
+domains=(ski.pointi.jokley.at www.ski.pointi.jokley.at)
 rsa_key_size=4096
 data_path="./data/certbot"
 email="donald_duck@vol.at"
