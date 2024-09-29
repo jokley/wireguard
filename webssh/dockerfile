@@ -1,16 +1,19 @@
 FROM arm64v8/alpine
 
-# Install Python 3, pip, and other required dependencies
-RUN apk add --no-cache python3 py3-pip
+# Install Python 3, pip, and virtualenv
+RUN apk add --no-cache python3 py3-pip py3-virtualenv
 
-# Ensure pip is upgraded
-RUN pip3 install --no-cache --upgrade pip
+# Create a virtual environment
+RUN python3 -m venv /opt/venv
 
-# Install webssh
-RUN pip3 install --no-cache webssh
+# Activate the virtual environment and install webssh
+RUN /opt/venv/bin/pip install webssh
 
 # Expose the necessary port
 EXPOSE 8080
+
+# Set the virtual environment as the default Python environment
+ENV PATH="/opt/venv/bin:$PATH"
 
 # Command to run the webssh server
 CMD ["wssh", "--address=0.0.0.0", "--port=8080"]
