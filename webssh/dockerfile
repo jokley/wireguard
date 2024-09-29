@@ -1,11 +1,12 @@
 FROM arm64v8/alpine
 
-# Install Python 3 and pip in Alpine
-RUN apk add --no-cache python3 py3-pip && \
-    python3 -m ensurepip && \
-    pip3 install --no-cache --upgrade pip
+# Install Python 3, pip, and other required dependencies
+RUN apk add --no-cache python3 py3-pip
 
-# Install webssh via pip
+# Ensure pip is upgraded
+RUN pip3 install --no-cache --upgrade pip
+
+# Install webssh
 RUN pip3 install --no-cache webssh
 
 # Expose the necessary port
