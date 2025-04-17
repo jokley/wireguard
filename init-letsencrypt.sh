@@ -1,11 +1,20 @@
 #!/bin/bash
 
-if ! [ -x "$(command -v docker-compose)" ]; then
-  echo 'Error: docker-compose is not installed.' >&2
+if ! [ -x "$(command -v docker compose)" ]; then
+  echo 'Error: docker compose is not installed.' >&2
   exit 1
 fi
 
-domains=(ski.pointi.jokley.at www.ski.pointi.jokley.at)
+#domains=(beck.pi.jokley.at www.beck.pi.jokley.at)
+#domains=(disti.pi.jokley.at www.disti.pi.jokley.at)
+#domains=(franz.venti.jokley.at www.franz.venti.jokley.at)
+#domains=(juen.pi.jokley.at www.juen.pi.jokley.at)
+#domains=(me.pi.jokley.at www.me.pi.jokley.at)
+#domains=(pi.jokley.at www.pi.jokley.at)
+#domains=(ski.pointi.jokley.at www.ski.pointi.jokley.at)
+#domains=(venti.pi.jokley.at www.venti.pi.jokley.at)
+domains=(zotta.venti.jokley.at www.zotta.venti.jokley.at)
+
 rsa_key_size=4096
 data_path="./data/certbot"
 email="donald_duck@vol.at"
@@ -30,7 +39,7 @@ fi
 echo "### Creating dummy certificate for $domains ..."
 path="/etc/letsencrypt/live/$domains"
 mkdir -p "$data_path/conf/live/$domains"
-docker-compose run --rm --entrypoint "\
+docker compose run --rm --entrypoint "\
   openssl req -x509 -nodes -newkey rsa:$rsa_key_size -days 1\
     -keyout '$path/privkey.pem' \
     -out '$path/fullchain.pem' \
@@ -39,11 +48,11 @@ echo
 
 
 echo "### Starting nginx ..."
-docker-compose up --force-recreate -d nginx
+docker compose up --force-recreate -d nginx
 echo
 
 echo "### Deleting dummy certificate for $domains ..."
-docker-compose run --rm --entrypoint "\
+docker compose run --rm --entrypoint "\
   rm -Rf /etc/letsencrypt/live/$domains && \
   rm -Rf /etc/letsencrypt/archive/$domains && \
   rm -Rf /etc/letsencrypt/renewal/$domains.conf" certbot
@@ -66,7 +75,7 @@ esac
 # Enable staging mode if needed
 if [ $staging != "0" ]; then staging_arg="--staging"; fi
 
-docker-compose run --rm --entrypoint "\
+docker compose run --rm --entrypoint "\
   certbot certonly --webroot -w /var/www/certbot \
     $staging_arg \
     $email_arg \
@@ -77,4 +86,4 @@ docker-compose run --rm --entrypoint "\
 echo
 
 echo "### Reloading nginx ..."
-docker-compose exec nginx nginx -s reload
+docker compose exec nginx nginx -s reload
