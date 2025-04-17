@@ -4,7 +4,7 @@ services:
     environment:
       - WG_HOST=pi.jokley.at
       #- PASSWORD=jokley82@wireguard
-      - PASSWORD_HASH=$2a$12$G00TgpeKWIXhFieXv2yzFuajwhRhAjJgZ3TNKGyvZ5GujMw4/BTw2
+      - PASSWORD_HASH='$2a$12$G00TgpeKWIXhFieXv2yzFuajwhRhAjJgZ3TNKGyvZ5GujMw4/BTw2'
       - WG_DEFAULT_ADDRESS=100.64.0.x
       - WG_DEFAULT_DNS=""
       #- WG_MTU=1420
