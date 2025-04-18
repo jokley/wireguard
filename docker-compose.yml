@@ -4,7 +4,7 @@ services:
     env_file:
       - wgeasy.env 
     environment:
-      - WG_HOST=pi.jokley.at
+      - WG_HOST=me.jokley.at
       - WG_DEFAULT_ADDRESS=100.64.0.x
       - WG_DEFAULT_DNS=""
       #- WG_MTU=1420
