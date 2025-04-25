@@ -1,2 +1,3 @@
 /data/certbot/conf/
 .htpasswd*
+.env
