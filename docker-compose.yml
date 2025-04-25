@@ -63,3 +63,17 @@ services:
  #   ports:
  #     - 8080:8080
     network_mode: "service:wg-easy"
+
+  authelia:
+    image: authelia/authelia:latest
+    container_name: authelia
+    restart: unless-stopped
+    env_file:
+      - ./authelia.env
+    volumes:
+      - ./data/authelia/config:/config
+      - ./data/authelia/users:/users
+    environment:
+      - TZ=Europe/Vienna
+    network_mode: "service:wg-easy"
+
