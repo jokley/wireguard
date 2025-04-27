@@ -20,3 +20,4 @@ users:
     displayname: "Alfred Beck"
     password: "$argon2id$v=19$m=65536,t=3,p=4$sUQHp4ZyRXbzSTIBDnZqLg$vml8+nGLTeRSMmFgdR+AhhlWr6jDXxOfUYBkfN+OmEE"
     email: beck@jokley.at
+    
