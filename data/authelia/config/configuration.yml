@@ -1,5 +1,5 @@
-host: 0.0.0.0
-port: 9091  # Port exposed from Docker
+server:
+  address: tcp://0.0.0.0:9091
 
 log:
   level: info
@@ -20,9 +20,8 @@ session:
   secret: '${SESSION_SECRET}'  # Loaded from env
   expiration: 3600
   inactivity: 300
-  domain: jokley.at  # Your cookie domain
-  cookies:
-    same_site: lax
+  cookies: 
+    default_redirection_url: https://me.jokley.at
 
 authentication_backend:
   file:
@@ -36,29 +35,29 @@ access_control:
     # Admin full access
     - domain: '*.jokley.at'
       policy: one_factor
-      groups:
-        - admin
+      subject:
+        - user:admin
 
     # Franz only gets franz.venti.jokley.at
     - domain: franz.venti.jokley.at
       policy: one_factor
-      subjects:
-        - 'user:franz'
+      subject:
+        - user:franz
 
     # Zotta only gets zotta.venti.jokley.at
     - domain: zotta.venti.jokley.at
       policy: one_factor
-      subjects:
-        - 'user:zotta'
+      subject:
+        - user:zotta
 
     # Beck only gets beck.jokley.at
     - domain: beck.jokley.at
       policy: one_factor
-      subjects:
-        - 'user:beck'
+      subject:
+        - user:beck
 
 storage:
-  encryption_key: '${ENCRYPTION_KEY}'  # Loaded from env
+  encryption_key: '${ENCRYPTION_KEY}'  # At least 20 characters long
   local:
     path: /config/db.sqlite3
 
