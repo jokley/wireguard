@@ -19,13 +19,6 @@ session:
   expiration: 3600
   inactivity: 300
   domain: jokley.at  # Specify the domain here
-  cookies:
-    authelia_session_cookie:
-      domain: jokley.at  # Per-cookie domain
-      path: /
-      same_site: lax
-      secure: true
-      expiration: 3600
 
 authentication_backend:
   file:
