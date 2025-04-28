@@ -1,4 +1,4 @@
 /data/certbot/conf/
-/data/authelia/users/
+/data/authelia/config/users_database.yml
 .htpasswd*
 .env

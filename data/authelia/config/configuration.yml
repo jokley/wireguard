@@ -8,20 +8,19 @@ theme: auto
 
 identity_validation:
   reset_password:
-    jwt_secret: '${JWT_SECRET}'  # Loaded from environment variable
+    jwt_secret: '${JWT_SECRET}'
 
 totp:
   issuer: jokley
 
-authelia_url: https://me.jokley.at  # Updated to the correct URL
-
 session:
   name: authelia_session
-  secret: '${SESSION_SECRET}'  # Loaded from environment variable
+  secret: '${SESSION_SECRET}'
   expiration: 3600
   inactivity: 300
   cookies:
     - domain: jokley.at
+      authelia_url: https://me.jokley.at
       name: authelia_session
       same_site: lax
       expiration: 3600
@@ -56,10 +55,10 @@ access_control:
         - user:beck
 
 storage:
-  encryption_key: '${ENCRYPTION_KEY}'  # Ensure this key is at least 20 characters long
+  encryption_key: ''
   local:
     path: /config/db.sqlite3
 
 notifier:
   filesystem:
-    filename: /config/notification.txt  # Optional if you want notification logs
+    filename: /config/notification.txt
