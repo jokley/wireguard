@@ -13,12 +13,13 @@ identity_validation:
 totp:
   issuer: jokley
 
+authelia_url: https://me.jokley.at  # Updated to the correct URL
+
 session:
   name: authelia_session
   secret: '${SESSION_SECRET}'  # Loaded from environment variable
   expiration: 3600
   inactivity: 300
-  authelia_url: https://me.jokley.at  # Updated to the correct URL
   cookies:
     - domain: jokley.at
       name: authelia_session

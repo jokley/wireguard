@@ -75,5 +75,6 @@ services:
       - ./data/authelia/users:/users
     environment:
       - TZ=Europe/Vienna
+    command: ["authelia", "--config", "/config/configuration.yml"]
     network_mode: "service:wg-easy"
 
