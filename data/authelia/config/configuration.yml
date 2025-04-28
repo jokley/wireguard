@@ -18,7 +18,13 @@ session:
   secret: '${SESSION_SECRET}'  # Loaded from environment variable
   expiration: 3600
   inactivity: 300
-  domain: jokley.at  # Specify the domain here
+  # Multi-domain configuration instead of the deprecated 'domain' option:
+  cookies:
+    - domain: jokley.at
+      name: authelia_session
+      same_site: lax
+      secure: true
+      expiration: 3600
 
 authentication_backend:
   file:
