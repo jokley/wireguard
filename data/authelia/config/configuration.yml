@@ -8,20 +8,24 @@ theme: auto
 
 identity_validation:
   reset_password:
-    jwt_secret: '${JWT_SECRET}'  # Loaded from env
-
-default_redirection_url: https://me.jokley.at
+    jwt_secret: '${JWT_SECRET}'  # Loaded from environment variable
 
 totp:
   issuer: jokley
 
 session:
   name: authelia_session
-  secret: '${SESSION_SECRET}'  # Loaded from env
+  secret: '${SESSION_SECRET}'  # Loaded from environment variable
   expiration: 3600
   inactivity: 300
-  cookies: 
-    default_redirection_url: https://me.jokley.at
+  domain: jokley.at  # Specify the domain here
+  cookies:
+    authelia_session_cookie:
+      domain: jokley.at  # Per-cookie domain
+      path: /
+      same_site: lax
+      secure: true
+      expiration: 3600
 
 authentication_backend:
   file:
@@ -32,32 +36,28 @@ authentication_backend:
 access_control:
   default_policy: one_factor
   rules:
-    # Admin full access
     - domain: '*.jokley.at'
       policy: one_factor
       subject:
         - user:admin
 
-    # Franz only gets franz.venti.jokley.at
     - domain: franz.venti.jokley.at
       policy: one_factor
       subject:
         - user:franz
 
-    # Zotta only gets zotta.venti.jokley.at
     - domain: zotta.venti.jokley.at
       policy: one_factor
       subject:
         - user:zotta
 
-    # Beck only gets beck.jokley.at
     - domain: beck.jokley.at
       policy: one_factor
       subject:
         - user:beck
 
 storage:
-  encryption_key: '${ENCRYPTION_KEY}'  # At least 20 characters long
+  encryption_key: '${ENCRYPTION_KEY}'  # Ensure this key is at least 20 characters long
   local:
     path: /config/db.sqlite3
 
