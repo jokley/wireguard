@@ -6,7 +6,10 @@ log:
 
 theme: auto
 
-jwt_secret: '${JWT_SECRET}'     # Loaded from env
+identity_validation:
+  reset_password:
+    jwt_secret: '${JWT_SECRET}'  # Loaded from env
+
 default_redirection_url: https://me.jokley.at
 
 totp:
@@ -14,10 +17,12 @@ totp:
 
 session:
   name: authelia_session
-  secret: '${SESSION_SECRET}'   # Loaded from env
+  secret: '${SESSION_SECRET}'  # Loaded from env
   expiration: 3600
   inactivity: 300
-  domain: jokley.at  # your cookie domain
+  domain: jokley.at  # Your cookie domain
+  cookies:
+    same_site: lax
 
 authentication_backend:
   file:
@@ -26,8 +31,7 @@ authentication_backend:
       algorithm: argon2id
 
 access_control:
-  default_policy: deny
-
+  default_policy: one_factor
   rules:
     # Admin full access
     - domain: '*.jokley.at'
@@ -53,12 +57,11 @@ access_control:
       subjects:
         - 'user:beck'
 
-
-session_cookie:
-  name: authelia_session
+storage:
+  encryption_key: '${ENCRYPTION_KEY}'  # Loaded from env
+  local:
+    path: /config/db.sqlite3
 
 notifier:
   filesystem:
     filename: /config/notification.txt  # Optional if you want notification logs
-
-secret: '${AUTHELIA_SECRET}'  # Loaded from env
