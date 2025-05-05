@@ -41,6 +41,7 @@ services:
     volumes:
       #- ./data/nginx:/etc/nginx/conf.d:ro
       - ./data/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./data/nginx/includes:/etc/nginx/includes:ro
       - ./data/nginx/.htpasswd_folder:/etc/nginx/.htpasswd_folder
       - ./data/wwwroot:/var/www/root:ro
       - ./data/certbot/conf:/etc/letsencrypt:ro       

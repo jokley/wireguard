@@ -2,3 +2,4 @@
 /data/authelia/config/users_database.yml
 .htpasswd*
 .env
+db.sqlite3

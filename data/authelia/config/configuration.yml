@@ -1,5 +1,6 @@
 server:
-  address: tcp://0.0.0.0:9091
+  address: 0.0.0.0:9091/auth
+
 
 log:
   level: info
@@ -14,14 +15,51 @@ totp:
   issuer: jokley
 
 session:
+  # Common session settings
   name: authelia_session
   secret: '${SESSION_SECRET}'
   expiration: 3600
   inactivity: 300
   cookies:
-    - domain: .jokley.at
-      authelia_url: https://me.jokley.at/auth  
+    - domain: me.jokley.at
+      authelia_url: https://me.jokley.at/auth
+      default_redirection_url: https://me.jokley.at/webssh/
       name: authelia_session
+      same_site: lax
+      expiration: 3600
+    
+    - domain: me.venti.jokley.at
+      authelia_url: https://me.venti.jokley.at/auth
+      default_redirection_url: https://me.venti.jokley.at/
+      name: authelia_session_venti
+      same_site: lax
+      expiration: 3600
+
+    - domain: franz.venti.jokley.at
+      authelia_url: https://franz.venti.jokley.at/auth
+      default_redirection_url: https://franz.venti.jokley.at/
+      name: authelia_session_venti
+      same_site: lax
+      expiration: 3600
+
+    - domain: zotta.venti.jokley.at
+      authelia_url: https://zotta.venti.jokley.at/auth
+      default_redirection_url: https://zotta.venti.jokley.at/
+      name: authelia_session_venti
+      same_site: lax
+      expiration: 3600
+
+    - domain: me.disti.jokley.at
+      authelia_url: https://me.disti.jokley.at/auth
+      default_redirection_url: https://me.disti.jokley.at/
+      name: authelia_session_venti
+      same_site: lax
+      expiration: 3600
+
+    - domain: beck.jokley.at
+      authelia_url: https://beck.jokley.at/auth
+      default_redirection_url: https://beck.jokley.at/
+      name: authelia_session_venti
       same_site: lax
       expiration: 3600
 
@@ -32,29 +70,43 @@ authentication_backend:
       algorithm: argon2id
 
 access_control:
-  default_policy: one_factor
+  default_policy: deny
   rules:
     - domain: me.jokley.at
       policy: one_factor
       resources:
         - "^/webssh/.*"
       subject:
-        - "user:jokley"
+        - "group:admin"
+    
+    - domain: me.venti.jokley.at
+      policy: one_factor
+      subject:
+        - "group:admin"
 
     - domain: franz.venti.jokley.at
       policy: one_factor
       subject:
         - "user:franz"
+        - "group:admin"
 
     - domain: zotta.venti.jokley.at
       policy: one_factor
       subject:
         - "user:zotta"
+        - "group:admin"
 
     - domain: beck.jokley.at
       policy: one_factor
       subject:
-        - "user:beck"
+        - "user:Beck"
+        - "group:admin"
+
+    - domain: me.disti.jokley.at
+      policy: one_factor
+      subject:
+        - "group:admin"
+
 
 storage:
   encryption_key: ''
