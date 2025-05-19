@@ -1,5 +1,5 @@
 /data/certbot/conf/
 /data/authelia/config/users_database.yml
 .htpasswd*
-.env
+authelia.env
 db.sqlite3
