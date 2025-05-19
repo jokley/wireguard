@@ -31,35 +31,42 @@ session:
     - domain: me.venti.jokley.at
       authelia_url: https://me.venti.jokley.at/auth
       default_redirection_url: https://me.venti.jokley.at/
-      name: authelia_session_venti
+      name: authelia_session_venti_me
       same_site: lax
       expiration: 3600
 
     - domain: franz.venti.jokley.at
       authelia_url: https://franz.venti.jokley.at/auth
       default_redirection_url: https://franz.venti.jokley.at/
-      name: authelia_session_venti
+      name: authelia_session_venti_franz
       same_site: lax
       expiration: 3600
 
     - domain: zotta.venti.jokley.at
       authelia_url: https://zotta.venti.jokley.at/auth
       default_redirection_url: https://zotta.venti.jokley.at/
-      name: authelia_session_venti
+      name: authelia_session_venti_zotta
+      same_site: lax
+      expiration: 3600
+
+    - domain: branner.venti.jokley.at
+      authelia_url: https://branner.venti.jokley.at/auth
+      default_redirection_url: https://branner.venti.jokley.at/
+      name: authelia_session_venti_branner
       same_site: lax
       expiration: 3600
 
     - domain: me.disti.jokley.at
       authelia_url: https://me.disti.jokley.at/auth
       default_redirection_url: https://me.disti.jokley.at/
-      name: authelia_session_venti
+      name: authelia_session_disti_me
       same_site: lax
       expiration: 3600
 
     - domain: beck.jokley.at
       authelia_url: https://beck.jokley.at/auth
       default_redirection_url: https://beck.jokley.at/
-      name: authelia_session_venti
+      name: authelia_session_home_beck
       same_site: lax
       expiration: 3600
 
@@ -95,6 +102,12 @@ access_control:
       subject:
         - "user:zotta"
         - "group:admin"
+     
+   - domain: branner.venti.jokley.at
+      policy: one_factor
+      subject:
+        - "user:branner"
+        - "group:admin"
 
     - domain: beck.jokley.at
       policy: one_factor
@@ -112,6 +125,11 @@ storage:
   encryption_key: ''
   local:
     path: /config/db.sqlite3
+
+notifier:
+  filesystem:
+    filename: /config/notification.txt
+
 
 notifier:
   smtp:
