@@ -114,5 +114,8 @@ storage:
     path: /config/db.sqlite3
 
 notifier:
-  filesystem:
-    filename: /config/notification.txt
+  smtp:
+    username: '${AUTHELIA_NOTIFIER_SMTP_USERNAME}'
+    password: '${AUTHELIA_NOTIFIER_SMTP_PASSWORD}'
+    address: submission://mail.smtp2go.com:587
+    sender: no-reply@jokley.at
