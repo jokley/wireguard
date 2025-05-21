@@ -20,6 +20,7 @@ session:
   secret: '${SESSION_SECRET}'
   expiration: 3600
   inactivity: 300
+  remember_me_duration: 7d 
   cookies:
     - domain: me.jokley.at
       authelia_url: https://me.jokley.at/auth
@@ -102,8 +103,8 @@ access_control:
       subject:
         - "user:zotta"
         - "group:admin"
-     
-   - domain: branner.venti.jokley.at
+
+    - domain: branner.venti.jokley.at
       policy: one_factor
       subject:
         - "user:branner"
@@ -125,11 +126,6 @@ storage:
   encryption_key: ''
   local:
     path: /config/db.sqlite3
-
-notifier:
-  filesystem:
-    filename: /config/notification.txt
-
 
 notifier:
   smtp:

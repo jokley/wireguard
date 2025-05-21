@@ -5,7 +5,7 @@ if ! [ -x "$(command -v docker compose)" ]; then
   exit 1
 fi
 
-domains=(beck.jokley.at www.beck.jokley.at)
+#domains=(beck.jokley.at www.beck.jokley.at)
 #domains=(me.disti.jokley.at www.me.disti.jokley.at)
 #domains=(franz.venti.jokley.at www.franz.venti.jokley.at)
 #domains=(juen.jokley.at www.juen.jokley.at)
@@ -14,6 +14,7 @@ domains=(beck.jokley.at www.beck.jokley.at)
 #domains=(ski.pointi.jokley.at www.ski.pointi.jokley.at)
 #domains=(me.venti.jokley.at www.me.venti.jokley.at)
 #domains=(zotta.venti.jokley.at www.zotta.venti.jokley.at)
+domains=(branner.venti.jokley.at www.branner.venti.jokley.at)
 
 rsa_key_size=4096
 data_path="./data/certbot"
