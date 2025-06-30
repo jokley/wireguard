@@ -57,6 +57,27 @@ session:
       same_site: lax
       expiration: 3600
 
+    - domain: brif.venti.jokley.at
+      authelia_url: https://brif.venti.jokley.at/auth
+      default_redirection_url: https://brif.venti.jokley.at/
+      name: authelia_session_venti_brif
+      same_site: lax
+      expiration: 3600
+
+    - domain: mathias.venti.jokley.at
+      authelia_url: https://mathias.venti.jokley.at/auth
+      default_redirection_url: https://mathias.venti.jokley.at/
+      name: authelia_session_venti_mathias
+      same_site: lax
+      expiration: 3600
+
+    - domain: walter.venti.jokley.at
+      authelia_url: https://walter.venti.jokley.at/auth
+      default_redirection_url: https://walter.venti.jokley.at/
+      name: authelia_session_venti_walter
+      same_site: lax
+      expiration: 3600
+
     - domain: me.disti.jokley.at
       authelia_url: https://me.disti.jokley.at/auth
       default_redirection_url: https://me.disti.jokley.at/
@@ -108,6 +129,24 @@ access_control:
       policy: one_factor
       subject:
         - "user:branner"
+        - "group:admin"
+
+    - domain: brif.venti.jokley.at
+      policy: one_factor
+      subject:
+        - "user:brif"
+        - "group:admin"
+
+    - domain: mathias.venti.jokley.at
+      policy: one_factor
+      subject:
+        - "user:mathias"
+        - "group:admin"
+
+    - domain: walter.venti.jokley.at
+      policy: one_factor
+      subject:
+        - "user:walter"
         - "group:admin"
 
     - domain: beck.jokley.at
