@@ -6,7 +6,7 @@ if ! [ -x "$(command -v docker compose)" ]; then
 fi
 
 
-domains=(walter.venti.jokley.at www.walter.venti.jokley.at)
+domains=(incoming.jokley.at www.incoming.jokley.at)
 
 rsa_key_size=4096
 data_path="./data/certbot"
