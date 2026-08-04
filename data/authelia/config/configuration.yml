@@ -20,7 +20,7 @@ session:
   secret: '${SESSION_SECRET}'
   expiration: 3600
   inactivity: 300
-  remember_me_duration: 7d 
+  remember_me: 7d 
   cookies:
     - domain: me.jokley.at
       authelia_url: https://me.jokley.at/auth
