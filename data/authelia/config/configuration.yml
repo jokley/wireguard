@@ -166,7 +166,7 @@ access_control:
     - domain: incoming.jokley.at
       policy: one_factor
       subject:
-        - "user:incoming"
+        - "group:incoming-users"
         - "group:admin"
 
     - domain: me.disti.jokley.at
