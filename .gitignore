@@ -1,5 +1,6 @@
 /data/certbot/conf/
 /data/authelia/config/users_database.yml
+/data/nginx/includes/incoming-secret.conf
 .htpasswd*
 authelia.env
 *.sqlite3
