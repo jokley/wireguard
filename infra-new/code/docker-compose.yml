@@ -1,0 +1,4 @@
+# SKELETON ONLY — do not deploy in the current migration step.
+# Planned responsibility: code-server with controlled access to /home/Projects.
+# Planned networks: edge-net for HTTP and ops-net for WireGuard peer access.
+services: {}
