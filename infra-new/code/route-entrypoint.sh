@@ -12,6 +12,12 @@ fi
 # `replace` is idempotent and modifies only this container's network namespace.
 ip -4 route replace "${peer_subnet}" via "${wireguard_gateway}"
 
-# Preserve the upstream image's entrypoint behavior and make code-server the
-# main process so it receives container signals directly.
-exec /usr/bin/entrypoint.sh "$@"
+# Drop root permanently before invoking the verified upstream entrypoint. Keep
+# the existing environment (including PASSWORD and TZ), but force identity/home
+# variables to agree with uid/gid 1000. Both gosu and the upstream entrypoint use
+# exec, so no root shell remains and signals reach dumb-init/code-server.
+exec gosu coder:coder env \
+  HOME=/home/coder \
+  USER=coder \
+  LOGNAME=coder \
+  /usr/bin/entrypoint.sh "$@"
