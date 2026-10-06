@@ -1,0 +1,4 @@
+# SKELETON ONLY — do not deploy in the current migration step.
+# Planned responsibility: standalone Authelia authentication service.
+# Planned network: edge-net. No configuration, secrets or state are migrated yet.
+services: {}
