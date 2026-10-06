@@ -1,0 +1,50 @@
+# Migration candidate only. Both external networks and the WireGuard transit
+# must exist before this stack can be tested.
+services:
+  code-server:
+    build:
+      context: .
+      args:
+        CODE_SERVER_VERSION: "4.139.1"
+    image: infra-code-server:4.139.1
+    container_name: code-server
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ:-Europe/Vienna}
+      PASSWORD: ${CODE_SERVER_PASSWORD:?Set CODE_SERVER_PASSWORD in a local .env file}
+    command:
+      - --bind-addr
+      - 0.0.0.0:8080
+      - --auth
+      - password
+      - /workspace
+    expose:
+      - "8080"
+    volumes:
+      - type: bind
+        source: ${WORKSPACE_DIR:-/home/Projects}
+        target: /workspace
+      - type: bind
+        source: ${CODE_SERVER_STATE_DIR:-./state/code-server}
+        target: /home/coder/.local/share/code-server
+    cap_drop:
+      - ALL
+    cap_add:
+      # NET_ADMIN installs the namespace-local route. SETUID/SETGID let gosu
+      # permanently switch from the root wrapper to coder:coder afterwards.
+      - NET_ADMIN
+      - SETUID
+      - SETGID
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - edge-net
+      - ops-net
+
+networks:
+  edge-net:
+    external: true
+    name: edge-net
+  ops-net:
+    external: true
+    name: ops-net
