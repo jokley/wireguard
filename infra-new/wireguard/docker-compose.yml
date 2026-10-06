@@ -1,0 +1,73 @@
+# Migration candidate only. Do not start this stack before the documented
+# backup, port-conflict, and rollback checks are complete.
+services:
+  wg-easy:
+    image: ghcr.io/wg-easy/wg-easy@sha256:66352ccb4b5095992550aa567df5118a5152b6ed31be34b0a8e118a3c3a35bf5
+    container_name: wg-easy-new
+    hostname: wg-easy
+    restart: unless-stopped
+
+    # Reuse the current authentication environment without copying its secret.
+    # This relative path resolves to the repository-root wgeasy.env file.
+    env_file:
+      - ../../wgeasy.env
+    environment:
+      WG_HOST: ${WG_HOST:-me.jokley.at}
+      WG_DEFAULT_ADDRESS: ${WG_DEFAULT_ADDRESS:-100.64.0.x}
+      WG_DEFAULT_DNS: ${WG_DEFAULT_DNS:-}
+      WG_PERSISTENT_KEEPALIVE: ${WG_PERSISTENT_KEEPALIVE:-25}
+      # This image version replaces its built-in defaults when these hooks are
+      # set, so each hook deliberately contains all four production rules plus
+      # the additional, tested ops-net masquerade rule.
+      WG_POST_UP: >-
+        iptables -t nat -A POSTROUTING -s 100.64.0.0/24 -o eth0 -j MASQUERADE;
+        iptables -A INPUT -p udp -m udp --dport 51820 -j ACCEPT;
+        iptables -A FORWARD -i wg0 -j ACCEPT;
+        iptables -A FORWARD -o wg0 -j ACCEPT;
+        iptables -t nat -A POSTROUTING -s 172.30.90.0/24 -o wg0 -j MASQUERADE;
+      WG_POST_DOWN: >-
+        iptables -t nat -D POSTROUTING -s 100.64.0.0/24 -o eth0 -j MASQUERADE;
+        iptables -D INPUT -p udp -m udp --dport 51820 -j ACCEPT;
+        iptables -D FORWARD -i wg0 -j ACCEPT;
+        iptables -D FORWARD -o wg0 -j ACCEPT;
+        iptables -t nat -D POSTROUTING -s 172.30.90.0/24 -o wg0 -j MASQUERADE;
+
+    # The production state remains at /root/.wg-easy. This bind mount is not
+    # activated unless an operator explicitly starts this migration candidate.
+    volumes:
+      - type: bind
+        source: ${WG_DATA_DIR:-/root/.wg-easy}
+        target: /etc/wireguard
+
+    ports:
+      - name: wireguard
+        target: 51820
+        published: "${WG_UDP_PORT:-51820}"
+        protocol: udp
+    expose:
+      # Management UI is available to attached Docker networks only.
+      - "51821"
+
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    sysctls:
+      net.ipv4.ip_forward: "1"
+      net.ipv4.conf.all.src_valid_mark: "1"
+
+    networks:
+      default: {}
+      ops-net:
+        ipv4_address: 172.30.90.2
+
+networks:
+  # Compose project-scoped bridge for stack-local communication.
+  default:
+    driver: bridge
+  # Created declaratively by this Compose project during a later deployment.
+  ops-net:
+    name: ops-net
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.30.90.0/24
