@@ -1,0 +1,4 @@
+# SKELETON ONLY — do not deploy in the current migration step.
+# Planned responsibility: standalone browser-based SSH application.
+# Planned networks: edge-net for HTTP and ops-net for WireGuard peer access.
+services: {}
