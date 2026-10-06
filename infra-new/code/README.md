@@ -99,24 +99,45 @@ keine Rückroute zum Docker-Netz benötigen. Der integrierte Terminalprozess kan
 danach mit einem separat bereitgestellten SSH-Key Ziele wie `100.64.0.3` und
 `100.64.0.4` erreichen.
 
-Für `ip route replace` ist `NET_ADMIN` technisch erforderlich. Die Capability
-gilt nur im Container-Namespace, erlaubt dort aber weitreichende Änderungen an
-Interfaces, Routen und Firewallzustand. Sie vergrößert damit die Auswirkungen
-einer Kompromittierung. `privileged: true` wird nicht verwendet; alle anderen
-Capabilities werden verworfen und `no-new-privileges` ist aktiviert. Der eigene
-Wrapper startet ausschließlich zum Setzen der Route als root und führt danach
-den Upstream-Entrypoint über `gosu` als `coder:coder` aus. Der verifizierte
-Upstream-Entrypoint führt selbst keinen Benutzerwechsel durch; ohne diesen
+Für `ip route replace` ist initial `NET_ADMIN` erforderlich. Die Capability gilt
+nur im Container-Namespace, erlaubt dort aber weitreichende Änderungen an
+Interfaces, Routen und Firewallzustand. `SETUID` und `SETGID` sind zusätzlich
+notwendig, damit `gosu` vom root-Wrapper zuverlässig zu `coder:coder` wechseln
+kann. Mit ausschließlich `NET_ADMIN` scheiterte dieser Wechsel auf dem echten
+ARM64-Zielserver reproduzierbar mit `operation not permitted`.
+
+`privileged: true` wird nicht verwendet. Compose verwirft zunächst alle
+Capabilities und fügt ausschließlich `NET_ADMIN`, `SETUID` und `SETGID` hinzu;
+`no-new-privileges` bleibt aktiviert. Der Wrapper setzt als root die Route und
+führt anschließend den Upstream-Entrypoint über `gosu` als `coder:coder` aus.
+Der Upstream-Entrypoint führt selbst keinen Benutzerwechsel durch; ohne diesen
 expliziten Schritt würde code-server als root weiterlaufen.
 
-**Hardening-Punkt:** Da `NET_ADMIN` in Compose am Service hängt, kann die
-Capability derzeit über die gesamte Containerlaufzeit verfügbar bleiben. Ein
-Wechsel des Anwendungsprozesses zum Benutzer `coder` ist allein kein belastbarer
-Nachweis dafür, dass die Capability im Terminalprozess nicht effektiv nutzbar
-ist. Das muss im gebauten Container ausdrücklich geprüft werden. Eine spätere
-Iteration soll die Capability nach dem Setzen der Route möglichst entziehen oder
-das Routing stärker isolieren; in diesem Schritt wird bewusst keine komplexere
-Routingarchitektur eingeführt.
+Der Runtime-Test nach dem `gosu`-Wechsel bestätigte für den laufenden
+code-server-Prozess:
+
+```text
+Uid:        1000 1000 1000 1000
+Gid:        1000 1000 1000 1000
+CapInh:     0000000000000000
+CapPrm:     0000000000000000
+CapEff:     0000000000000000
+CapBnd:     00000000000010c0
+NoNewPrivs: 1
+```
+
+Ein anschließendes `id` ergab `uid=1000(coder) gid=1000(coder)`. Ein als `coder`
+ausgeführtes `ip route add 192.0.2.0/24 dev eth0` scheiterte korrekt mit
+`RTNETLINK answers: Operation not permitted`. Damit sind `NET_ADMIN`, `SETUID`
+und `SETGID` im laufenden code-server-Prozess nicht effektiv verfügbar.
+
+Das Bounding Set `CapBnd=00000000000010c0` zeigt lediglich, welche Capabilities
+ein Prozess grundsätzlich noch erhalten könnte. Ein Eintrag im Bounding Set
+bedeutet nicht, dass der laufende Prozess diese Capability besitzt oder benutzen
+kann. Für den geprüften code-server-Prozess sind die entscheidenden Werte
+`CapPrm=0` und `CapEff=0`; es gibt dort weder erlaubte noch effektive
+Capabilities. Die Minimierung des initialen root-/Capability-Fensters bleibt
+dennoch ein möglicher späterer Hardening-Punkt.
 
 ## Authentifizierung
 
@@ -153,9 +174,9 @@ dem Edge vertraut. Bis dahin bleibt die interne Passwortprüfung aktiv.
 6. Der nächste Laufzeittest bestätigt Route, PID/Prozessbaum, UID/GID
    `1000:1000`, `HOME=/home/coder`, dass keine Config unter `/root` entsteht,
    den Listener auf `0.0.0.0:8080` und einen SSH-Client-Aufruf.
-7. Im nächsten Testcontainer wird gemessen, ob `NET_ADMIN` im
-   code-server-/Terminalprozess noch effektiv verfügbar ist; das Ergebnis fließt
-   in das spätere Capability-Hardening ein.
+7. Bei Änderungen an Image, Entrypoint oder Capabilities wird erneut bestätigt,
+   dass `CapPrm=0`, `CapEff=0`, `NoNewPrivs=1` gelten und `coder` keine Route
+   verändern kann.
 8. Ein starkes lokales `CODE_SERVER_PASSWORD` und ein beschreibbarer State-Pfad
    mit UID/GID `1000` sind vorbereitet.
 9. Workspace-Umfang und Schreibberechtigungen sind ausdrücklich freigegeben.
@@ -173,10 +194,12 @@ ausführbaren Upstream-Entrypoint bestätigt. Der Lauf als UID/GID `0:0` und mit
 aufgedeckt: Der Upstream-Entrypoint startet code-server für den aufrufenden
 Benutzer und führt keinen eigenen Privilege-Drop aus.
 
-Der überarbeitete `gosu`-Pfad ist noch nicht zur Laufzeit verifiziert. Die unter
-„Voraussetzungen für einen ersten Test“ genannten Prozess-, HOME-, Config-,
-Port-, SSH-, Routen- und Capability-Prüfungen bleiben daher vor jedem Deployment
-verbindlich.
+Der überarbeitete `gosu`-Pfad ist mit den in Compose ergänzten Capabilities
+`SETUID` und `SETGID` erfolgreich verifiziert. UID/GID, leere erlaubte und
+effektive Capability-Sets, `NoNewPrivs=1` sowie das Verbot nachträglicher
+Routenänderungen durch `coder` wurden auf dem Zielserver bestätigt. Die übrigen
+unter „Voraussetzungen für einen ersten Test“ genannten Prozess-, HOME-, Config-,
+Port-, SSH- und Routenprüfungen bleiben vor dem Deployment verbindlich.
 
 ## Rollback
 

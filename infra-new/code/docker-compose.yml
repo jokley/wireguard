@@ -30,9 +30,11 @@ services:
     cap_drop:
       - ALL
     cap_add:
-      # Required only inside this container's network namespace so its
-      # entrypoint can install the route to the WireGuard peer subnet.
+      # NET_ADMIN installs the namespace-local route. SETUID/SETGID let gosu
+      # permanently switch from the root wrapper to coder:coder afterwards.
       - NET_ADMIN
+      - SETUID
+      - SETGID
     security_opt:
       - no-new-privileges:true
     networks:
