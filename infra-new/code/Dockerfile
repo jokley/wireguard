@@ -17,6 +17,6 @@ COPY route-entrypoint.sh /usr/local/bin/route-entrypoint.sh
 RUN chmod 0755 /usr/local/bin/route-entrypoint.sh
 
 # The wrapper needs NET_ADMIN while installing the namespace-local route. It
-# then uses gosu to delegate to the upstream entrypoint as `coder:coder`.
+# then uses gosu to start dumb-init/code-server directly as `coder:coder`.
 USER root
 ENTRYPOINT ["/usr/local/bin/route-entrypoint.sh"]

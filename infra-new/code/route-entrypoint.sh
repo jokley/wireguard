@@ -12,12 +12,12 @@ fi
 # `replace` is idempotent and modifies only this container's network namespace.
 ip -4 route replace "${peer_subnet}" via "${wireguard_gateway}"
 
-# Drop root permanently before invoking the verified upstream entrypoint. Keep
-# the existing environment (including PASSWORD and TZ), but force identity/home
-# variables to agree with uid/gid 1000. Both gosu and the upstream entrypoint use
-# exec, so no root shell remains and signals reach dumb-init/code-server.
+# Drop root permanently and start the application directly. Keep the existing
+# environment (including PASSWORD and TZ), but force identity/home variables to
+# agree with uid/gid 1000. The exec chain leaves no root shell, while dumb-init
+# remains PID 1 for signal forwarding and child reaping.
 exec gosu coder:coder env \
   HOME=/home/coder \
   USER=coder \
   LOGNAME=coder \
-  /usr/bin/entrypoint.sh "$@"
+  dumb-init /usr/bin/code-server "$@"

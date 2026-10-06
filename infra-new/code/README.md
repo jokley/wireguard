@@ -81,12 +81,22 @@ ip -4 route replace 100.64.0.0/24 via 172.30.90.2
 
 Danach gibt das Script seine root-Privilegien mit `gosu coder:coder` ab, setzt
 `HOME=/home/coder`, `USER=coder` und `LOGNAME=coder` und ersetzt sich per `exec`
-durch den originalen Upstream-Entrypoint. Dessen verifiziertes Ende
-`exec dumb-init /usr/bin/code-server "$@"` erhält die saubere Signalweitergabe.
-Es bleibt keine root-Shell zurück; code-server und sein Terminal sollen als
-UID/GID `1000:1000` laufen und ihren Zustand nicht unter `/root` anlegen. Die
-Route wird ausschließlich im Netzwerk-Namespace des Containers gesetzt und
+durch `dumb-init /usr/bin/code-server "$@"`. `dumb-init` bleibt damit für
+Signalweitergabe und das Aufräumen von Kindprozessen erhalten. Es bleibt keine
+root-Shell zurück; code-server und sein Terminal laufen als die auf ARM64
+bestätigte UID/GID `1000:1000` und legen ihren Zustand nicht unter `/root` an.
+Die Route wird ausschließlich im Netzwerk-Namespace des Containers gesetzt und
 verschwindet mit dem Container. Am Host wird keine Route verändert.
+
+Der originale `/usr/bin/entrypoint.sh` wird bewusst nicht mehr aufgerufen. Er
+führt zuerst `eval "$(fixuid -q)"` aus. `fixuid` benötigt Root-/Setuid-Verhalten,
+das nach unserem absichtlichen Privilege-Drop und mit `no-new-privileges` nicht
+mehr verfügbar sein soll; der vorherige Startpfad erzeugte deshalb die Warnung
+`fixuid: fixuid is not running as root`. Der anschließend relevante Teil des
+Upstream-Entrypoints ist nachweislich nur
+`exec dumb-init /usr/bin/code-server "$@"` und wird jetzt direkt ausgeführt.
+Die optionalen Upstream-Mechanismen `DOCKER_USER` und `ENTRYPOINTD` werden in
+diesem Stack nicht verwendet.
 
 Der vollständige Pfad ist:
 
@@ -109,9 +119,9 @@ ARM64-Zielserver reproduzierbar mit `operation not permitted`.
 `privileged: true` wird nicht verwendet. Compose verwirft zunächst alle
 Capabilities und fügt ausschließlich `NET_ADMIN`, `SETUID` und `SETGID` hinzu;
 `no-new-privileges` bleibt aktiviert. Der Wrapper setzt als root die Route und
-führt anschließend den Upstream-Entrypoint über `gosu` als `coder:coder` aus.
-Der Upstream-Entrypoint führt selbst keinen Benutzerwechsel durch; ohne diesen
-expliziten Schritt würde code-server als root weiterlaufen.
+startet anschließend `dumb-init` und code-server über `gosu` als `coder:coder`.
+Der bewusst übersprungene Upstream-Entrypoint führt selbst keinen Benutzerwechsel
+durch; ohne den expliziten `gosu`-Schritt würde code-server als root weiterlaufen.
 
 Der Runtime-Test nach dem `gosu`-Wechsel bestätigte für den laufenden
 code-server-Prozess:
@@ -171,9 +181,10 @@ dem Edge vertraut. Bis dahin bleibt die interne Passwortprüfung aktiv.
 4. WireGuard-Routing und die ops-net-MASQUERADE-Regel sind aktiv.
 5. Der dokumentierte ARM64-Digest des Tags `4.139.1` ist vor dem Build nochmals
    gegen die Registry geprüft.
-6. Der nächste Laufzeittest bestätigt Route, PID/Prozessbaum, UID/GID
-   `1000:1000`, `HOME=/home/coder`, dass keine Config unter `/root` entsteht,
-   den Listener auf `0.0.0.0:8080` und einen SSH-Client-Aufruf.
+6. Bei Änderungen am Startpfad bestätigt ein erneuter Laufzeittest Route,
+   PID/Prozessbaum, UID/GID `1000:1000`, `HOME=/home/coder`, dass keine Config
+   unter `/root` entsteht, den Listener auf `0.0.0.0:8080` und einen
+   SSH-Client-Aufruf.
 7. Bei Änderungen an Image, Entrypoint oder Capabilities wird erneut bestätigt,
    dass `CapPrm=0`, `CapEff=0`, `NoNewPrivs=1` gelten und `coder` keine Route
    verändern kann.
@@ -197,9 +208,17 @@ Benutzer und führt keinen eigenen Privilege-Drop aus.
 Der überarbeitete `gosu`-Pfad ist mit den in Compose ergänzten Capabilities
 `SETUID` und `SETGID` erfolgreich verifiziert. UID/GID, leere erlaubte und
 effektive Capability-Sets, `NoNewPrivs=1` sowie das Verbot nachträglicher
-Routenänderungen durch `coder` wurden auf dem Zielserver bestätigt. Die übrigen
-unter „Voraussetzungen für einen ersten Test“ genannten Prozess-, HOME-, Config-,
-Port-, SSH- und Routenprüfungen bleiben vor dem Deployment verbindlich.
+Routenänderungen durch `coder` wurden auf dem Zielserver bestätigt. Der
+End-to-End-Test bestätigte außerdem die Route `100.64.0.0/24 via 172.30.90.2`,
+den Listener auf `0.0.0.0:8080` und den SSH-Verbindungsaufbau über
+`ops-net -> wg-easy -> wg0` zu `100.64.0.3:22`. Das anschließende
+`Permission denied` war wegen absichtlich ungültiger Credentials erwartet und
+bestätigt für diesen Test die Netzwerk- und SSH-Erreichbarkeit, nicht eine
+erfolgreiche Anmeldung.
+
+Der jetzt vereinfachte direkte Start über `dumb-init` muss im nächsten isolierten
+Test noch auf Warnungsfreiheit, Prozessbaum, Benutzer-/HOME-Werte und
+Config-Ablage geprüft werden, bevor ein Deployment freigegeben wird.
 
 ## Rollback
 
