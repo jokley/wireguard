@@ -1,0 +1,5 @@
+# SKELETON ONLY — do not deploy in the current migration step.
+# Planned responsibility: Nginx, Certbot, TLS termination and reverse proxy.
+# Planned network: edge-net (and ops-net only while direct VPN proxies remain).
+# Config, secrets and certificate state will be wired in a later reviewed step.
+services: {}
