@@ -2,8 +2,8 @@
 # fixed Alpine release instead of its floating architecture-specific latest tag.
 FROM arm64v8/alpine:3.22.1
 
-# The deployed WebSSH package version is not derivable from this repo. Pin it
-# only after the target host's current runtime version is recorded.
+# Preserve the verified production WebSSH version during the infrastructure
+# cutover; application upgrades belong in a separate, later change.
 RUN apk add --no-cache \
       iproute2 \
       py3-pip \
@@ -14,7 +14,7 @@ RUN apk add --no-cache \
     && adduser -S -D -u 10001 -h /home/webssh -s /sbin/nologin \
       -G webssh webssh \
     && python3 -m venv /opt/venv \
-    && /opt/venv/bin/pip install --no-cache-dir webssh
+    && /opt/venv/bin/pip install --no-cache-dir webssh==1.6.3
 
 ENV PATH="/opt/venv/bin:${PATH}"
 
