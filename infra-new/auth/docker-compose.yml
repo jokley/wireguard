@@ -1,0 +1,29 @@
+# Migration candidate only. Do not deploy until the production image reference,
+# external runtime files, secrets, backup, and rollback have been verified.
+services:
+  authelia:
+    image: ${AUTH_IMAGE:-authelia/authelia@sha256:e325963609cc928861ffe8130c09111862df88dd8fcafbcd2c47e5ff0a4ae268}
+    container_name: authelia-new
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - type: bind
+        source: ./config/configuration.yml
+        target: /config/configuration.yml
+        read_only: true
+      - type: bind
+        source: ${AUTH_USERS_DIR:-./runtime}
+        target: /users
+      - type: bind
+        source: ${AUTH_STATE_DIR:-./state}
+        target: /state
+    expose:
+      - "9091"
+    networks:
+      - edge-net
+
+networks:
+  edge-net:
+    external: true
+    name: edge-net
