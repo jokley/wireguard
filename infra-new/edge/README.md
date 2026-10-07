@@ -165,6 +165,22 @@ zweite Legacy-`listen` mit einem DNS-Namen wird im Container nicht übernommen;
 eine nicht im Container vorhandene öffentliche Adresse zu binden. Backend,
 Zertifikatsname und WireGuard-Abhängigkeit bleiben unverändert.
 
+Der vorgesehene Datenpfad ist:
+
+```text
+Host EDGE_MQTT_TLS_PORT
+  -> Docker-Portfreigabe
+  -> edge-network:8883
+  -> Nginx TLS
+  -> 100.64.0.3:1883 (MQTT ohne TLS)
+```
+
+Der ARM64-Runtime-Test muss über den Testport `18883` einen vollständigen
+TLS-Handshake gegen den generischen Container-Listener bestätigen. Zusätzlich
+sind TLS 1.2, das erwartete Zertifikat und die Weiterleitung zum unveränderten
+MQTT-Backend zu prüfen. Die hostnamegebundene Legacy-Direktive wird dabei nicht
+wieder eingeführt.
+
 ## Certbot, TLS-State und ACME
 
 Certbot bleibt ein eigener Service. `${LETSENCRYPT_DIR}` wird für Nginx read-only
