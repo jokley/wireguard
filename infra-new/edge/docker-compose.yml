@@ -1,0 +1,82 @@
+# Migration candidate only. Local .env values select test or cutover ports and
+# the exact live-verified nginx/certbot image references.
+services:
+  edge-network:
+    build:
+      context: .
+      dockerfile: Dockerfile.network
+    image: infra-edge-network:test
+    container_name: edge-network-new
+    restart: unless-stopped
+    ports:
+      - "${EDGE_HTTP_PORT:?Set EDGE_HTTP_PORT in .env}:80"
+      - "${EDGE_HTTPS_PORT:?Set EDGE_HTTPS_PORT in .env}:443"
+      - "${EDGE_MQTT_TLS_PORT:?Set EDGE_MQTT_TLS_PORT in .env}:8883"
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_ADMIN
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      edge-net:
+        aliases:
+          - edge-nginx
+      ops-net: {}
+
+  edge-nginx:
+    image: ${EDGE_NGINX_IMAGE:?Set EDGE_NGINX_IMAGE to the verified production reference}
+    container_name: edge-nginx-new
+    restart: unless-stopped
+    network_mode: service:edge-network
+    depends_on:
+      - edge-network
+    volumes:
+      - type: bind
+        source: ./nginx/nginx.conf
+        target: /etc/nginx/nginx.conf
+        read_only: true
+      - type: bind
+        source: ./nginx/includes
+        target: /etc/nginx/includes
+        read_only: true
+      - type: bind
+        source: ${EDGE_INCOMING_INCLUDE_FILE:?Set EDGE_INCOMING_INCLUDE_FILE to the local runtime include}
+        target: /etc/nginx/includes/incoming-secret.conf
+        read_only: true
+      - type: bind
+        source: ${LETSENCRYPT_DIR:?Set LETSENCRYPT_DIR in .env}
+        target: /etc/letsencrypt
+        read_only: true
+      - type: bind
+        source: ${CERTBOT_WEBROOT:?Set CERTBOT_WEBROOT in .env}
+        target: /var/www/certbot
+        read_only: true
+    command: >-
+      /bin/sh -c 'while :; do sleep 6h & wait $${!}; nginx -s reload; done &
+      nginx -g "daemon off;"'
+
+  certbot:
+    image: ${EDGE_CERTBOT_IMAGE:?Set EDGE_CERTBOT_IMAGE to the verified production reference}
+    container_name: edge-certbot-new
+    restart: unless-stopped
+    volumes:
+      - type: bind
+        source: ${LETSENCRYPT_DIR:?Set LETSENCRYPT_DIR in .env}
+        target: /etc/letsencrypt
+      - type: bind
+        source: ${CERTBOT_WEBROOT:?Set CERTBOT_WEBROOT in .env}
+        target: /var/www/certbot
+    entrypoint: >-
+      /bin/sh -c 'trap exit TERM; while :; do certbot renew;
+      sleep 12h & wait $${!}; done;'
+    networks:
+      - edge-net
+
+networks:
+  edge-net:
+    external: true
+    name: edge-net
+  ops-net:
+    external: true
+    name: ops-net
