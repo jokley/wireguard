@@ -1,0 +1,229 @@
+# Code-Server-Stack: vorbereiteter Migrationskandidat
+
+Dieser eigenständige Stack stellt später eine zentrale browserbasierte
+Entwicklungs- und Admin-Oberfläche für Projekte unter `/home/Projects` bereit.
+Er ist noch nicht deployt und verändert weder den produktiven Root-Stack noch
+Docker-Netze, Host-Routen oder Projektdateien.
+
+## Image und Build
+
+Der Stack baut ein minimales abgeleitetes Image aus
+`codercom/code-server:4.139.1`, dem laut offiziellem Changelog am 26.09.2026
+veröffentlichten stabilen Release. Der feste aktuelle Release-Tag verhindert,
+dass ein später verändertes `latest` unkontrolliert neue Software in den Stack
+einführt. Das offizielle Image unterstützt sowohl `amd64` als auch `arm64`.
+
+Vor einem produktiven Deployment muss der konkrete, zur Zielarchitektur
+gehörende Image-Digest auf dem Zielserver ermittelt werden. Dieser Digest kann
+und sollte nach erfolgreichem Test optional zusätzlich im `FROM` gepinnt werden,
+damit auch der feste Tag nicht nachträglich auf andere Image-Inhalte zeigen kann.
+Auf dem ARM64-Zielserver wurde für Version `4.139.1` folgender Basis-Digest
+verifiziert:
+
+```text
+codercom/code-server@sha256:0c067c3cf09ed1830ce282387826be8feefef8a5828f462791c2df3f1007ee17
+```
+
+Der Dockerfile bleibt vorerst tag-basiert, damit die dokumentierte
+Multi-Architektur-Nutzung nicht versehentlich auf ein architekturspezifisches
+Manifest eingeschränkt wird.
+
+Der ARM64-Build hat `/usr/sbin/ip`, `/usr/bin/ssh` und den ausführbaren
+`/usr/bin/entrypoint.sh` bestätigt. Das kleine `Dockerfile` installiert
+`openssh-client` und `iproute2` trotzdem explizit, damit diese Anforderungen
+nicht von impliziten Upstream-Paketdetails abhängen. Zusätzlich wird nur `gosu`
+als kleiner, zweckgebundener Privilege-Drop-Helfer installiert. Docker- oder
+WireGuard-Werkzeuge werden nicht ergänzt.
+
+## Workspace und Sicherheitswirkung
+
+`${WORKSPACE_DIR:-/home/Projects}` wird schreibbar nach `/workspace` gebunden.
+Damit kann code-server mehrere Repositories wie `incoming`, den aktuellen
+Infra-Checkout und spätere Apps bearbeiten. Dieser Komfort bedeutet zugleich,
+dass jeder Prozess oder kompromittierte Benutzer in code-server **alle** dort
+gemounteten Projekte verändern kann — einschließlich versionierter
+Infra-Konfigurationen.
+
+Secrets dürfen daher nicht automatisch in den Workspace kopiert werden. Nicht
+gemountet werden insbesondere `/root`, `/etc`, `/var/run/docker.sock`, anderer
+Docker-Socket-Zugriff, WireGuard-State, Let's-Encrypt-State oder private
+SSH-Schlüssel. `/var/run/docker.sock` würde code-server praktisch host-root-nahe
+Kontrolle ermöglichen und bleibt deshalb ausdrücklich ausgeschlossen. Host- und
+Container-Management muss später separat und bewusst entworfen werden.
+
+Falls SSH-Keys benötigt werden, dürfen sie erst in einem späteren Schritt als
+separate, explizite und möglichst read-only Bind-Mounts ergänzt werden. Dieses
+Skeleton erzeugt oder kopiert keine Keys.
+
+## Netzwerke und HTTP
+
+Der Stack konsumiert ausschließlich zwei bereits vorhandene externe Netze:
+
+- `edge-net` verbindet den internen HTTP-Port `8080` später mit Edge/Nginx.
+- `ops-net` verbindet das Terminal mit dem WireGuard-Transit.
+
+Beide Netzwerke sind mit `external: true` deklariert und werden von diesem Stack
+nicht erzeugt oder verändert. Es gibt kein `ports`-Mapping; `expose: 8080`
+dokumentiert nur den containerinternen HTTP-Endpunkt. Der geplante Zugriffsweg
+lautet:
+
+```text
+Internet -> Edge/Nginx -> Authelia -> edge-net -> code-server:8080
+```
+
+## SSH und deklarative Route zu den Pis
+
+Vor dem Start von code-server führt `route-entrypoint.sh` idempotent aus:
+
+```text
+ip -4 route replace 100.64.0.0/24 via 172.30.90.2
+```
+
+Danach gibt das Script seine root-Privilegien mit `gosu coder:coder` ab, setzt
+`HOME=/home/coder`, `USER=coder` und `LOGNAME=coder` und ersetzt sich per `exec`
+durch `dumb-init /usr/bin/code-server "$@"`. `dumb-init` bleibt damit für
+Signalweitergabe und das Aufräumen von Kindprozessen erhalten. Es bleibt keine
+root-Shell zurück; code-server und sein Terminal laufen als die auf ARM64
+bestätigte UID/GID `1000:1000` und legen ihren Zustand nicht unter `/root` an.
+Die Route wird ausschließlich im Netzwerk-Namespace des Containers gesetzt und
+verschwindet mit dem Container. Am Host wird keine Route verändert.
+
+Der originale `/usr/bin/entrypoint.sh` wird bewusst nicht mehr aufgerufen. Er
+führt zuerst `eval "$(fixuid -q)"` aus. `fixuid` benötigt Root-/Setuid-Verhalten,
+das nach unserem absichtlichen Privilege-Drop und mit `no-new-privileges` nicht
+mehr verfügbar sein soll; der vorherige Startpfad erzeugte deshalb die Warnung
+`fixuid: fixuid is not running as root`. Der anschließend relevante Teil des
+Upstream-Entrypoints ist nachweislich nur
+`exec dumb-init /usr/bin/code-server "$@"` und wird jetzt direkt ausgeführt.
+Die optionalen Upstream-Mechanismen `DOCKER_USER` und `ENTRYPOINTD` werden in
+diesem Stack nicht verwendet.
+
+Der vollständige Pfad ist:
+
+```text
+code-server -> ops-net -> wg-easy 172.30.90.2 -> wg0 -> 100.64.0.x -> Pis
+```
+
+wg-easy übernimmt das Source-NAT von `172.30.90.0/24` nach `wg0`, sodass die Pis
+keine Rückroute zum Docker-Netz benötigen. Der integrierte Terminalprozess kann
+danach mit einem separat bereitgestellten SSH-Key Ziele wie `100.64.0.3` und
+`100.64.0.4` erreichen.
+
+Für `ip route replace` ist initial `NET_ADMIN` erforderlich. Die Capability gilt
+nur im Container-Namespace, erlaubt dort aber weitreichende Änderungen an
+Interfaces, Routen und Firewallzustand. `SETUID` und `SETGID` sind zusätzlich
+notwendig, damit `gosu` vom root-Wrapper zuverlässig zu `coder:coder` wechseln
+kann. Mit ausschließlich `NET_ADMIN` scheiterte dieser Wechsel auf dem echten
+ARM64-Zielserver reproduzierbar mit `operation not permitted`.
+
+`privileged: true` wird nicht verwendet. Compose verwirft zunächst alle
+Capabilities und fügt ausschließlich `NET_ADMIN`, `SETUID` und `SETGID` hinzu;
+`no-new-privileges` bleibt aktiviert. Der Wrapper setzt als root die Route und
+startet anschließend `dumb-init` und code-server über `gosu` als `coder:coder`.
+Der bewusst übersprungene Upstream-Entrypoint führt selbst keinen Benutzerwechsel
+durch; ohne den expliziten `gosu`-Schritt würde code-server als root weiterlaufen.
+
+Der Runtime-Test nach dem `gosu`-Wechsel bestätigte für den laufenden
+code-server-Prozess:
+
+```text
+Uid:        1000 1000 1000 1000
+Gid:        1000 1000 1000 1000
+CapInh:     0000000000000000
+CapPrm:     0000000000000000
+CapEff:     0000000000000000
+CapBnd:     00000000000010c0
+NoNewPrivs: 1
+```
+
+Ein anschließendes `id` ergab `uid=1000(coder) gid=1000(coder)`. Ein als `coder`
+ausgeführtes `ip route add 192.0.2.0/24 dev eth0` scheiterte korrekt mit
+`RTNETLINK answers: Operation not permitted`. Damit sind `NET_ADMIN`, `SETUID`
+und `SETGID` im laufenden code-server-Prozess nicht effektiv verfügbar.
+
+Das Bounding Set `CapBnd=00000000000010c0` zeigt lediglich, welche Capabilities
+ein Prozess grundsätzlich noch erhalten könnte. Ein Eintrag im Bounding Set
+bedeutet nicht, dass der laufende Prozess diese Capability besitzt oder benutzen
+kann. Für den geprüften code-server-Prozess sind die entscheidenden Werte
+`CapPrm=0` und `CapEff=0`; es gibt dort weder erlaubte noch effektive
+Capabilities. Die Minimierung des initialen root-/Capability-Fensters bleibt
+dennoch ein möglicher späterer Hardening-Punkt.
+
+## Authentifizierung
+
+code-server startet mit der unterstützten Authentifizierungsart `password`. Das
+Passwort kommt ausschließlich aus `CODE_SERVER_PASSWORD` in einer nicht
+versionierten lokalen `.env`; Compose bricht bei einem fehlenden Wert ab. Die
+Beispieldatei enthält kein Secret. `auth: none` wird nicht aktiviert.
+
+Später schützt zusätzlich Edge/Nginx mit Authelia den Zugriff. Erst nach einer
+bewussten Sicherheitsfreigabe und bestätigter Netzwerkisolation kann entschieden
+werden, ob die doppelte Authentifizierung bestehen bleibt oder code-server nur
+dem Edge vertraut. Bis dahin bleibt die interne Passwortprüfung aktiv.
+
+## Config, Secrets und State
+
+- **CONFIG:** `docker-compose.yml`, `Dockerfile`, `route-entrypoint.sh`, README
+  und `.env.example` werden versioniert.
+- **SECRETS:** code-server-Passwort und private SSH-Schlüssel gehören niemals ins
+  Git. Es werden standardmäßig keine SSH-Schlüssel gemountet.
+- **STATE:** Extensions, Benutzerdaten und Einstellungen liegen unter
+  `/home/coder/.local/share/code-server` und werden später aus
+  `${CODE_SERVER_STATE_DIR:-./state/code-server}` persistent eingebunden. Das
+  Verzeichnis ist durch die übergeordnete `.gitignore` ausgeschlossen. Dieses
+  Skeleton erzeugt oder verändert noch keinen Host-State.
+
+## Voraussetzungen für einen ersten Test
+
+1. `edge-net` existiert und ist für den isolierten Test vorbereitet.
+2. Das vom WireGuard-Stack erzeugte `ops-net` existiert als `172.30.90.0/24`.
+3. wg-easy ist darin unter `172.30.90.2` erreichbar.
+4. WireGuard-Routing und die ops-net-MASQUERADE-Regel sind aktiv.
+5. Der dokumentierte ARM64-Digest des Tags `4.139.1` ist vor dem Build nochmals
+   gegen die Registry geprüft.
+6. Bei Änderungen am Startpfad bestätigt ein erneuter Laufzeittest Route,
+   PID/Prozessbaum, UID/GID `1000:1000`, `HOME=/home/coder`, dass keine Config
+   unter `/root` entsteht, den Listener auf `0.0.0.0:8080` und einen
+   SSH-Client-Aufruf.
+7. Bei Änderungen an Image, Entrypoint oder Capabilities wird erneut bestätigt,
+   dass `CapPrm=0`, `CapEff=0`, `NoNewPrivs=1` gelten und `coder` keine Route
+   verändern kann.
+8. Ein starkes lokales `CODE_SERVER_PASSWORD` und ein beschreibbarer State-Pfad
+   mit UID/GID `1000` sind vorbereitet.
+9. Workspace-Umfang und Schreibberechtigungen sind ausdrücklich freigegeben.
+
+Erst dann folgen in einem separaten Schritt Syntaxprüfung, Image-Build und ein
+isolierter Funktionstest für HTTP, Persistenz, Route und SSH. Es findet jetzt
+kein Deployment statt.
+
+## Stand der isolierten Build-Verifikation
+
+Der Build auf dem echten ARM64-Zielserver hat Architektur `arm64`, code-server
+`4.139.1`, den Benutzer `coder` mit UID/GID `1000:1000`, `ip`, `ssh` sowie den
+ausführbaren Upstream-Entrypoint bestätigt. Der Lauf als UID/GID `0:0` und mit
+`HOME=/root` hat zugleich den jetzt behobenen Fehler im bisherigen Wrapper
+aufgedeckt: Der Upstream-Entrypoint startet code-server für den aufrufenden
+Benutzer und führt keinen eigenen Privilege-Drop aus.
+
+Der überarbeitete `gosu`-Pfad ist mit den in Compose ergänzten Capabilities
+`SETUID` und `SETGID` erfolgreich verifiziert. UID/GID, leere erlaubte und
+effektive Capability-Sets, `NoNewPrivs=1` sowie das Verbot nachträglicher
+Routenänderungen durch `coder` wurden auf dem Zielserver bestätigt. Der
+End-to-End-Test bestätigte außerdem die Route `100.64.0.0/24 via 172.30.90.2`,
+den Listener auf `0.0.0.0:8080` und den SSH-Verbindungsaufbau über
+`ops-net -> wg-easy -> wg0` zu `100.64.0.3:22`. Das anschließende
+`Permission denied` war wegen absichtlich ungültiger Credentials erwartet und
+bestätigt für diesen Test die Netzwerk- und SSH-Erreichbarkeit, nicht eine
+erfolgreiche Anmeldung.
+
+Der jetzt vereinfachte direkte Start über `dumb-init` muss im nächsten isolierten
+Test noch auf Warnungsfreiheit, Prozessbaum, Benutzer-/HOME-Werte und
+Config-Ablage geprüft werden, bevor ein Deployment freigegeben wird.
+
+## Rollback
+
+Da dieser Schritt keine Runtime-Ressource erzeugt, besteht aktuell kein
+Runtime-Rollback. Bei einem späteren Test wird ausschließlich der neue
+Code-Stack entfernt; externe Netze, wg-easy, der produktive Root-Stack und die
+Projekt-Repositories bleiben unangetastet. Vor einem Rückbau ist neu entstandener
+State kontrolliert zu sichern oder bewusst zu verwerfen.
