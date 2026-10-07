@@ -1,0 +1,35 @@
+# Migration candidate only. The external networks and WireGuard transit must
+# exist before an isolated test; this stack creates neither network.
+services:
+  webssh:
+    build:
+      context: .
+    image: infra-webssh:test
+    container_name: webssh-new
+    restart: unless-stopped
+    command:
+      - --address=0.0.0.0
+      - --port=8080
+    expose:
+      - "8080"
+    cap_drop:
+      - ALL
+    cap_add:
+      # NET_ADMIN installs the namespace-local peer route. SETUID/SETGID let
+      # su-exec permanently switch from root to the unprivileged webssh user.
+      - NET_ADMIN
+      - SETUID
+      - SETGID
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - edge-net
+      - ops-net
+
+networks:
+  edge-net:
+    external: true
+    name: edge-net
+  ops-net:
+    external: true
+    name: ops-net
