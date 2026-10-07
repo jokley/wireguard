@@ -1,0 +1,210 @@
+# Eigenständiger Edge-Stack: Migrationskandidat
+
+Dieser Stack bereitet Nginx und Certbot als eigenständigen öffentlichen Edge
+vor. Er ist nicht deployt. Der produktive Root-Stack, der laufende Edge, die
+bereits vorhandenen Testnetze und `authelia-new` bleiben unangetastet.
+
+## Analysierte Legacy-Architektur
+
+Im Root-Compose läuft Nginx mit `network_mode: "service:wg-easy"`. Dadurch teilt
+es Interfaces, veröffentlichte Ports, Routing und `wg0` mit wg-easy und erreicht
+direkte Ziele unter `100.64.0.0/24` ohne eigene Route. Der Root-Stack
+veröffentlicht 80/TCP, 443/TCP und 8883/TCP über diesen gemeinsamen Namespace;
+außerdem werden dort heute weitere, nicht zum neuen Edge gehörende Ports
+veröffentlicht.
+
+Legacy-Nginx bindet die Hauptkonfiguration, Includes, Webroot und den
+Let's-Encrypt-State ein. Zertifikate werden read-only verwendet. Ein Shell-Loop
+lädt Nginx alle sechs Stunden neu. Certbot bindet denselben Zertifikats-State und
+ACME-Webroot schreibbar ein und versucht alle zwölf Stunden ein Renewal. Das
+separate Legacy-Hilfsskript kann initiale Zertifikate per Webroot ausstellen,
+erzeugt dafür temporäre Zertifikate und lädt Nginx neu; dieser invasive Ablauf
+wird nicht in den neuen Stack kopiert oder ausgeführt.
+
+Es gibt keinen expliziten Resolver und keine benutzerdefinierten Access-/Error-
+Logpfade. Nginx nutzt seine Standardlogs. HTTP wird grundsätzlich auf HTTPS
+umgeleitet, außer `/.well-known/acme-challenge/`, das aus dem Certbot-Webroot
+bedient wird.
+
+## Produktive Images: noch zu verifizieren
+
+Das Repository enthält nur die beweglichen Referenzen `arm64v8/nginx` und
+`certbot/certbot:arm64v8-latest`. Docker ist in dieser Arbeitsumgebung nicht
+verfügbar; laufende Image-Referenzen, IDs, RepoDigests, Architektur sowie
+`nginx -v` und `certbot --version` konnten daher nicht belastbar ermittelt
+werden. Der neue Compose-Stack verlangt beide Referenzen in der lokalen `.env`
+und rät keine Version. Vor dem Runtime-Test müssen sie auf dem ARM64-Zielserver
+read-only erfasst und ohne Upgrade für den Cutover gepinnt werden.
+
+## Domains und Legacy-Upstream-Matrix
+
+Alle aktiven TLS-Server und direkten Pi-Ziele bleiben in der neuen
+`nginx.conf` erhalten:
+
+| Domain/Pfad | Legacy-Upstream | Neuer Upstream | Authelia | WebSocket | Protokoll |
+| --- | --- | --- | --- | --- | --- |
+| `me.jokley.at/webssh/` | `localhost:8080` | `webssh:8080` | ja | ja | HTTP |
+| `me.jokley.at/` | `localhost:51821` | `wg-easy:51821` | nein | ja | HTTP |
+| `me.venti.jokley.at` | `100.64.0.2:80` | unverändert | ja | ja | HTTP |
+| `me.disti.jokley.at` | `100.64.0.3:80` | unverändert | ja | ja | HTTP |
+| `beck.jokley.at` | `100.64.0.4:80` | unverändert | ja | ja | HTTP |
+| `juen.jokley.at` | `100.64.0.5:80` | unverändert | nein | ja | HTTP |
+| `zotta.venti.jokley.at` | `100.64.0.6:80` | unverändert | ja | ja | HTTP |
+| `franz.venti.jokley.at` | `100.64.0.7:80` | unverändert | ja | ja | HTTP |
+| `branner.venti.jokley.at` | `100.64.0.8:80` | unverändert | ja | ja | HTTP |
+| `brif.venti.jokley.at` | `100.64.0.9:80` | unverändert | ja | ja | HTTP |
+| `mathias.venti.jokley.at` | `100.64.0.10:80` | unverändert | ja | ja | HTTP |
+| `walter.venti.jokley.at` | `100.64.0.11:80` | unverändert | ja | ja | HTTP |
+| `incoming.jokley.at/` | `incoming-nginx:8080` | unverändert | ja | ja | HTTP |
+| `incoming.jokley.at/api/` | `incoming-nginx:8080` | unverändert | ja | nein | HTTP |
+| MQTT auf `8883` | `100.64.0.3:1883` | unverändert | nein | n/a | TCP/TLS |
+
+`ski.pointi.jokley.at -> 100.64.0.5:8080` ist im Legacy-File vollständig
+auskommentiert und bleibt auch im neuen File inaktiv. Es wird nicht als aktive
+Route migriert.
+
+Im Legacy-Nginx existiert kein code-server-Upstream. Deshalb wird ohne bestätigte
+Domain, Zertifikat und Auth-Policy kein neuer virtueller Host erfunden. Sobald
+diese Angaben feststehen, ist das Ziel über `edge-net` ausdrücklich
+`code-server:8080`; WebSocket-/Upgrade-Header müssen erhalten bleiben.
+
+## Authelia-Integration
+
+Die Include-Struktur und Redirect-Logik bleiben erhalten. Nur die
+Namespace-gebundenen Upstreams wechseln von `localhost:9091` zu Service-DNS:
+
+| Legacy | Neu |
+| --- | --- |
+| `/auth/ -> localhost:9091/auth/` | `/auth/ -> authelia:9091/auth/` |
+| `/static/ -> localhost:9091/auth/static/` | `/static/ -> authelia:9091/auth/static/` |
+| `/authelia-auth -> localhost:9091/auth/api/authz/auth-request` | `/authelia-auth -> authelia:9091/auth/api/authz/auth-request` |
+
+`X-Original-Method`, `X-Original-URL`, `X-Forwarded-For`,
+`X-Forwarded-Proto` und `Cookie` werden weiterhin an Authelia übergeben.
+Remote-User, Remote-Groups, Remote-Name und Remote-Email werden aus der
+Auth-Antwort übernommen; bestehende 401- und Login-Redirect-Handler bleiben
+unverändert. Policies werden nicht im Edge verändert.
+
+## Netzwerke und reproduzierbare Pi-Route
+
+`edge-net` (`172.30.91.0/24`) und `ops-net` (`172.30.90.0/24`) werden beide als
+extern referenziert und von diesem Stack nicht erzeugt. `ops-net` ist zwingend,
+weil die aktiven HTTP-Upstreams `100.64.0.2` bis `100.64.0.11`, das wg-easy-UI
+und MQTT weiterhin erreichbar sein müssen.
+
+Ein minimaler `edge-network`-Dienst besitzt beide Netze, veröffentlicht die drei
+Edge-Ports und setzt in seinem eigenen Namespace idempotent:
+
+```text
+100.64.0.0/24 via 172.30.90.2
+```
+
+`edge-nginx` teilt ausschließlich diesen dedizierten Edge-Netzwerk-Namespace,
+nicht den von wg-easy. Nur der kleine Namespace-Halter erhält `NET_ADMIN`; Nginx
+erhält keine Capability. Damit bleibt die Route deklarativ, ohne Hostroute,
+`docker network connect` oder manuelle Runtime-Regel. Dieser Ansatz und die
+effektiven Capabilities müssen vor dem Cutover auf ARM64 isoliert geprüft werden.
+
+## Incoming
+
+`incoming-nginx:8080` bleibt unverändert. Damit Docker-DNS diesen Namen im neuen
+Edge auflösen kann, muss der Incoming-Stack später seinen Nginx-Dienst zusätzlich
+an das externe `edge-net` anbinden. Diese minimale Änderung gehört ins separate
+Incoming-Repository und wurde hier nicht vorgenommen. Der lokale Include mit
+Incoming-spezifischer sensitiver Konfiguration wird nicht kopiert; sein Pfad wird
+über `.env` als externe read-only Runtime-Datei gemountet.
+
+## MQTT TLS
+
+Der bestehende `stream {}`-Block terminiert TLS auf Port `8883` mit dem
+Zertifikat für `me.disti.jokley.at` und proxied TCP zu `100.64.0.3:1883`.
+Konfiguriert sind TLS 1.2 und ein Proxy-Connect-Timeout von einer Sekunde. Der
+zweite Legacy-`listen` mit einem DNS-Namen wird im Container nicht übernommen;
+`listen 8883 ssl` deckt den veröffentlichten Containerport ab, ohne zu versuchen,
+eine nicht im Container vorhandene öffentliche Adresse zu binden. Backend,
+Zertifikatsname und WireGuard-Abhängigkeit bleiben unverändert.
+
+## Certbot, TLS-State und ACME
+
+Certbot bleibt ein eigener Service. `${LETSENCRYPT_DIR}` wird für Nginx read-only
+und für Certbot read-write nach `/etc/letsencrypt` gemountet.
+`${CERTBOT_WEBROOT}` wird entsprechend read-only beziehungsweise read-write nach
+`/var/www/certbot` gemountet. Beides ist externer Runtime-State und durch
+`.gitignore` ausgeschlossen. Es wurden weder Zertifikate noch private Schlüssel
+kopiert.
+
+Der Renewal-Loop entspricht zunächst dem Legacy-Intervall von zwölf Stunden.
+Nginx lädt wie bisher alle sechs Stunden neu. Vor dem Test sind Dateirechte,
+Renewal-Konfiguration, Zertifikatsnamen und die sichere Reload-Kopplung zu
+validieren. In diesem Schritt wird kein Zertifikat ausgestellt oder erneuert.
+
+## Testmodus und Cutover-Modus
+
+Dieselbe Compose-/Nginx-Konfiguration wird in beiden Modi verwendet. Nur die
+lokale, ignorierte `.env` ändert die veröffentlichten Ports:
+
+| Modus | `EDGE_HTTP_PORT` | `EDGE_HTTPS_PORT` | `EDGE_MQTT_TLS_PORT` |
+| --- | ---: | ---: | ---: |
+| isolierter Test | `18080` | `18443` | `18883` |
+| späterer Cutover | `80` | `443` | `8883` |
+
+`.env.example` lässt die Portwerte absichtlich leer. Die produktiven Ports
+dürfen erst nach dem Stop des Legacy-Listeners im kontrollierten Cutover gesetzt
+werden. HTTPS-Tests verwenden ausschließlich bewusst bereitgestellte read-only
+Testkopien oder einen expliziten externen Runtime-Pfad; TLS-State kommt nie ins
+Git.
+
+## Lokales `.env`-Modell
+
+`infra-new/edge/.env` enthält ausschließlich lokale Runtime-Konfiguration:
+verifizierte Image-Referenzen, Test- oder Cutover-Ports, Zeitzone, TLS-State,
+ACME-Webroot und den Pfad des externen Incoming-Includes. Die Datei wird niemals
+versioniert. `.env.example` enthält nur leere, nicht-sensitive Felder und den
+nicht-sensitiven Zeitzonenwert. Es gibt keine Secretwerte oder realistisch
+aussehenden Dummy-Secrets in Git.
+
+Privilegierte Docker-/root-Benutzer können Environmentwerte sehen. Deshalb
+enthält `.env` keine Zertifikats-Private-Keys oder Auth-Tokens; sie enthält nur
+Pfade zu lokal geschütztem Runtime-State.
+
+## Startreihenfolge und Runtime-Testplan
+
+Ein späterer isolierter Test benötigt folgende Reihenfolge:
+
+1. Exakte produktive Nginx-/Certbot-Image-Digests und Versionen erfassen.
+2. Testkopien beziehungsweise bewusst isolierte Runtime-Pfade für TLS-State,
+   ACME-Webroot und Incoming-Include vorbereiten.
+3. Bestehendes `edge-net`, `ops-net`, wg-easy `172.30.90.2` und seine NAT-Regel
+   prüfen, ohne den aktuellen Testzustand zu verändern.
+4. Authelia, WebSSH und — sobald konfiguriert — code-server im `edge-net`
+   bereitstellen. Incoming muss vor dem Nginx-Konfigurationstest ebenfalls am
+   `edge-net` hängen, da Nginx Upstreamnamen beim Start auflöst.
+5. `edge-network` mit den drei Testports starten und Route sowie Capability-Set
+   prüfen.
+6. Nginx mit Test-TLS-State starten und `nginx -t` ausführen.
+7. HTTP-Redirect, ACME-Webroot, TLS, alle virtuellen Hosts, Authelia-Verhalten,
+   WebSockets, direkte Pi-Upstreams, Incoming und MQTT Ende-zu-Ende testen.
+8. Certbot-Konfiguration zunächst nur read-only inspizieren; Renewal erst in
+   einem ausdrücklich freigegebenen separaten Test prüfen.
+9. Sicherstellen, dass keine produktiven Ports, Zertifikate oder Backends
+   verändert wurden und alle Testcontainer/-ports rückstandsfrei entfernen.
+
+## Security und GitGuardian
+
+- Kein Docker-Socket, Host-Networking oder `privileged: true`.
+- Nginx-Konfiguration und TLS-State sind für Nginx read-only.
+- Nur Certbot erhält Schreibzugriff auf seinen expliziten Runtime-State.
+- Keine unnötig persistenten Logs; Nginx verwendet Container-Standardlogs.
+- Keine Secrets, Zertifikatsdateien, privaten Schlüssel oder realistisch
+  aussehenden Dummywerte im Git.
+- Sensitive Incoming-Konfiguration bleibt eine externe, ignorierte Runtime-Datei.
+- Image- und Portwerte stehen nur in der ignorierten lokalen `.env`.
+
+## Rollback
+
+Der Legacy-Edge bleibt bis zum vollständigen, abgenommenen Cutover produktiv.
+Bei jedem Fehler werden ausschließlich die neuen Testcontainer und Testports
+entfernt. Die externen Netze, wg-easy, Authelia, Incoming, Zertifikate und der
+Root-Stack bleiben unangetastet. Erst nach einem erfolgreichen End-to-End-Test,
+gesichertem TLS-State und dokumentiertem Rückfallverfahren dürfen 80/443/8883 an
+den neuen Edge übergeben werden.

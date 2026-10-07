@@ -1,0 +1,8 @@
+FROM arm64v8/alpine:3.22.1
+
+RUN apk add --no-cache iproute2
+
+COPY scripts/network-entrypoint.sh /usr/local/bin/network-entrypoint.sh
+RUN chmod 0755 /usr/local/bin/network-entrypoint.sh
+
+ENTRYPOINT ["/usr/local/bin/network-entrypoint.sh"]
