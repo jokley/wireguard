@@ -1,4 +1,49 @@
-# SKELETON ONLY — do not deploy in the current migration step.
-# Planned responsibility: standalone Authelia authentication service.
-# Planned network: edge-net. No configuration, secrets or state are migrated yet.
-services: {}
+# Migration candidate only. Do not deploy until the production image reference,
+# external runtime files, secrets, backup, and rollback have been verified.
+services:
+  authelia:
+    image: ${AUTHELIA_IMAGE:-authelia/authelia@sha256:e325963609cc928861ffe8130c09111862df88dd8fcafbcd2c47e5ff0a4ae268}
+    container_name: authelia-new
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ:-Europe/Vienna}
+      AUTHELIA_IDENTITY_VALIDATION_RESET_PASSWORD_JWT_SECRET_FILE: /run/secrets/authelia_jwt_secret
+      AUTHELIA_SESSION_SECRET_FILE: /run/secrets/authelia_session_secret
+      AUTHELIA_STORAGE_ENCRYPTION_KEY_FILE: /run/secrets/authelia_storage_encryption_key
+      AUTHELIA_NOTIFIER_SMTP_USERNAME: ${AUTHELIA_NOTIFIER_SMTP_USERNAME:?Set AUTHELIA_NOTIFIER_SMTP_USERNAME locally}
+      AUTHELIA_NOTIFIER_SMTP_PASSWORD_FILE: /run/secrets/authelia_smtp_password
+    volumes:
+      - type: bind
+        source: ./config/configuration.yml
+        target: /config/configuration.yml
+        read_only: true
+      - type: bind
+        source: ${AUTHELIA_USERS_DATABASE_DIR:-./runtime}
+        target: /users
+      - type: bind
+        source: ${AUTHELIA_STATE_DIR:-./state}
+        target: /state
+    secrets:
+      - authelia_jwt_secret
+      - authelia_session_secret
+      - authelia_storage_encryption_key
+      - authelia_smtp_password
+    expose:
+      - "9091"
+    networks:
+      - edge-net
+
+networks:
+  edge-net:
+    external: true
+    name: edge-net
+
+secrets:
+  authelia_jwt_secret:
+    file: ${AUTHELIA_JWT_SECRET_FILE:?Set AUTHELIA_JWT_SECRET_FILE to a local secret file}
+  authelia_session_secret:
+    file: ${AUTHELIA_SESSION_SECRET_FILE:?Set AUTHELIA_SESSION_SECRET_FILE to a local secret file}
+  authelia_storage_encryption_key:
+    file: ${AUTHELIA_STORAGE_ENCRYPTION_KEY_FILE:?Set AUTHELIA_STORAGE_ENCRYPTION_KEY_FILE to a local secret file}
+  authelia_smtp_password:
+    file: ${AUTHELIA_SMTP_PASSWORD_FILE:?Set AUTHELIA_SMTP_PASSWORD_FILE to a local secret file}

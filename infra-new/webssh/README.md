@@ -22,11 +22,13 @@ Python 3, pip und virtualenv, erzeugt `/opt/venv`, installiert das PyPI-Paket
 wssh --address=0.0.0.0 --port=8080
 ```
 
-Es enthält weder `USER` noch eigenen Entrypoint; der Prozess läuft daher als
-root. Obwohl das Legacy-Dockerfile das Paket nicht pinnt, wurde die tatsächlich
-produktive Runtime im Image `wireguard-webssh` auf dem ARM64-Server verifiziert:
-Sowohl `wssh --version` als auch `pip show webssh` melden WebSSH `1.6.3`; Python
-läuft dort in Version `3.12.13` und `wssh` liegt unter `/opt/venv/bin/wssh`.
+Es enthält weder `USER` noch eigenen Entrypoint; der Prozess läuft daher nach
+Repositorystand als root. Die konkret produktiv installierte WebSSH-Version ist
+weder im Repository festgeschrieben noch in dieser Arbeitsumgebung per Runtime-
+Inspect bestimmbar. Sie darf vor dem Cutover nicht geraten werden: Auf dem
+ARM64-Zielserver sind `wssh --version` beziehungsweise Paketmetadaten und der
+Image-Digest zu erfassen. Erst danach soll `webssh` auf genau diese getestete
+Version gepinnt werden.
 
 ## Neues Image und unprivilegierter Benutzer
 
@@ -35,12 +37,6 @@ verwendet den festen ARM64-Basistag `arm64v8/alpine:3.22.1`. Zusätzlich werden
 nur `iproute2` für die Route und Alpines kleiner Privilege-Drop-Helfer `su-exec`
 installiert. Das Image legt den dedizierten Benutzer und die Gruppe `webssh` mit
 UID/GID `10001:10001` und Home `/home/webssh` an.
-
-Das neue Image installiert ausdrücklich `webssh==1.6.3`. Damit bleibt die
-Anwendungsversion beim Infrastruktur-Cutover identisch zur produktiven Runtime;
-Netzwerk- und Sicherheitsmigration werden nicht mit einem gleichzeitigen
-Applikationsupgrade vermischt. Ein zukünftiges WebSSH-Upgrade ist ein eigener,
-erst nach dem erfolgreichen Cutover zu planender und zu testender Schritt.
 
 Der Container startet ausschließlich für die Routenoperation als root.
 `route-entrypoint.sh` prüft UID 0 und setzt idempotent:
@@ -106,8 +102,8 @@ WireGuard-Routing und ops-net-MASQUERADE aktiv sein. Der Test muss mindestens
 bestätigen:
 
 1. Basisimage und Build funktionieren auf ARM64; Image-Digests werden erfasst.
-2. `wssh --version` und `pip show webssh` bestätigen im neuen Image weiterhin
-   die gepinnte Version `1.6.3`.
+2. Die produktive Legacy-WebSSH-Version wird ermittelt und eine feste Version
+   für das neue Image ausgewählt.
 3. `ip`, `su-exec` und `wssh` sind vorhanden; WebSSH lauscht auf
    `0.0.0.0:8080`, ohne dass ein Host-Port veröffentlicht ist.
 4. Die Route `100.64.0.0/24 via 172.30.90.2` ist vorhanden und SSH-Verbindungen
