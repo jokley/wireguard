@@ -113,20 +113,47 @@ Capability.
 
 Compose verwirft zunächst alle Capabilities. `NET_ADMIN` wird nur zum Setzen der
 Route benötigt; `SETUID` und `SETGID` ermöglichen ausschließlich den
-Privilege-Drop durch `su-exec`. `no-new-privileges:true` bleibt aktiv. Nach dem
-Wechsel werden für PID 1 `CapPrm = 0`, `CapEff = 0` und `NoNewPrivs = 1`
-erwartet. Damit bleibt die Route deklarativ, ohne Hostroute,
-`docker network connect` oder manuelle Runtime-Regel. Diese Werte und der
-Fortbestand der Route müssen vor dem Cutover auf ARM64 gemessen werden.
+Privilege-Drop durch `su-exec`. `no-new-privileges:true` bleibt aktiv. Auf dem
+ARM64-Zielserver wurden für PID 1 nach dem Wechsel UID/GID 10001,
+`CapPrm = 0`, `CapEff = 0` und `NoNewPrivs = 1` bestätigt. Die Route blieb
+vorhanden, während ein weiterer Route-Änderungsversuch als unprivilegierter
+Benutzer erwartungsgemäß scheiterte. Aus demselben Namespace waren der direkte
+Pi-HTTP-/MQTT-Zugriff sowie wg-easy, Authelia und WebSSH erreichbar. Damit bleibt
+die Route deklarativ, ohne Hostroute, `docker network connect` oder manuelle
+Runtime-Regel. Der Cutover-Test soll diese Ergebnisse als Regressionstest erneut
+bestätigen.
 
 ## Incoming
 
 `incoming-nginx:8080` bleibt unverändert. Damit Docker-DNS diesen Namen im neuen
 Edge auflösen kann, muss der Incoming-Stack später seinen Nginx-Dienst zusätzlich
-an das externe `edge-net` anbinden. Diese minimale Änderung gehört ins separate
-Incoming-Repository und wurde hier nicht vorgenommen. Der lokale Include mit
-Incoming-spezifischer sensitiver Konfiguration wird nicht kopiert; sein Pfad wird
-über `.env` als externe read-only Runtime-Datei gemountet.
+an das externe `edge-net` anbinden und dort ausdrücklich den Netzwerkalias
+`incoming-nginx` erhalten. Ein dokumentarisches Beispiel für die spätere
+Änderung im Incoming-Compose ist:
+
+```yaml
+services:
+  incoming-nginx:
+    networks:
+      edge-net:
+        aliases:
+          - incoming-nginx
+
+networks:
+  edge-net:
+    external: true
+    name: edge-net
+```
+
+Ein manuelles `docker network connect` ohne diesen Alias genügt nicht. Die
+Änderung gehört ins separate Incoming-Repository und wurde hier nicht
+vorgenommen.
+
+Der lokale Include mit Incoming-spezifischer sensitiver Konfiguration wird
+nicht kopiert. Er wird separat von den versionierten Includes unter
+`/etc/nginx/runtime/incoming-secret.conf` read-only eingebunden. Dadurch liegt
+der Dateimount nicht mehr innerhalb des bereits read-only gemounteten
+Verzeichnisses `/etc/nginx/includes`.
 
 ## MQTT TLS
 

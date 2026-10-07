@@ -44,7 +44,7 @@ services:
         read_only: true
       - type: bind
         source: ${EDGE_INCOMING_INCLUDE_FILE:?Set EDGE_INCOMING_INCLUDE_FILE to the local runtime include}
-        target: /etc/nginx/includes/incoming-secret.conf
+        target: /etc/nginx/runtime/incoming-secret.conf
         read_only: true
       - type: bind
         source: ${LETSENCRYPT_DIR:?Set LETSENCRYPT_DIR in .env}
