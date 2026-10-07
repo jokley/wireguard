@@ -1,0 +1,8 @@
+.env
+.env.*
+!.env.example
+
+secrets/
+runtime/
+state/
+*.secret
