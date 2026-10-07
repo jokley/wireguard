@@ -16,6 +16,8 @@ services:
       - ALL
     cap_add:
       - NET_ADMIN
+      - SETUID
+      - SETGID
     security_opt:
       - no-new-privileges:true
     networks:
@@ -25,7 +27,7 @@ services:
       ops-net: {}
 
   edge-nginx:
-    image: ${EDGE_NGINX_IMAGE:?Set EDGE_NGINX_IMAGE to the verified production reference}
+    image: ${EDGE_NGINX_IMAGE:-arm64v8/nginx@sha256:b312465509d25554910dfbf88323ede17eeb159fdc1307a05280e282fe4b47d3}
     container_name: edge-nginx-new
     restart: unless-stopped
     network_mode: service:edge-network
@@ -57,9 +59,11 @@ services:
       nginx -g "daemon off;"'
 
   certbot:
-    image: ${EDGE_CERTBOT_IMAGE:?Set EDGE_CERTBOT_IMAGE to the verified production reference}
+    image: ${EDGE_CERTBOT_IMAGE:-certbot/certbot@sha256:0d9c7c8f71a81fcbc1acb96060194ce9e97a528fa907dcc46a72b8b8d523faab}
     container_name: edge-certbot-new
     restart: unless-stopped
+    profiles:
+      - certbot
     volumes:
       - type: bind
         source: ${LETSENCRYPT_DIR:?Set LETSENCRYPT_DIR in .env}

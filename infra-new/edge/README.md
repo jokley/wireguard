@@ -26,15 +26,20 @@ Logpfade. Nginx nutzt seine Standardlogs. HTTP wird grundsätzlich auf HTTPS
 umgeleitet, außer `/.well-known/acme-challenge/`, das aus dem Certbot-Webroot
 bedient wird.
 
-## Produktive Images: noch zu verifizieren
+## Verifizierte produktive Images
 
-Das Repository enthält nur die beweglichen Referenzen `arm64v8/nginx` und
-`certbot/certbot:arm64v8-latest`. Docker ist in dieser Arbeitsumgebung nicht
-verfügbar; laufende Image-Referenzen, IDs, RepoDigests, Architektur sowie
-`nginx -v` und `certbot --version` konnten daher nicht belastbar ermittelt
-werden. Der neue Compose-Stack verlangt beide Referenzen in der lokalen `.env`
-und rät keine Version. Vor dem Runtime-Test müssen sie auf dem ARM64-Zielserver
-read-only erfasst und ohne Upgrade für den Cutover gepinnt werden.
+Die produktive Runtime wurde auf dem ARM64-Zielserver read-only verifiziert.
+Für den Infrastruktur-Cutover werden exakt diese Stände verwendet; ein
+gleichzeitiges Nginx- oder Certbot-Upgrade ist ausdrücklich ausgeschlossen:
+
+| Komponente | Version | Architektur | Image-ID | RepoDigest |
+| --- | --- | --- | --- | --- |
+| Nginx | `nginx/1.27.5` | `arm64` | `sha256:1f94323bafb2ac98d25b664b8c48b884a8db9db3d9c98921b3b8ade588b2e676` | `arm64v8/nginx@sha256:b312465509d25554910dfbf88323ede17eeb159fdc1307a05280e282fe4b47d3` |
+| Certbot | `certbot 4.0.0` | `arm64` | `sha256:ffa654b4667fd371d3d976938db836df533d4cad08284b66d151c88281ead239` | `certbot/certbot@sha256:0d9c7c8f71a81fcbc1acb96060194ce9e97a528fa907dcc46a72b8b8d523faab` |
+
+Compose verwendet diese unveränderlichen Digests als Defaults. Die lokale
+`.env` dokumentiert sie ebenfalls und darf sie bei einem späteren, bewusst
+geprüften Upgrade explizit überschreiben. `latest` wird nicht verwendet.
 
 ## Domains und Legacy-Upstream-Matrix
 
@@ -100,10 +105,19 @@ Edge-Ports und setzt in seinem eigenen Namespace idempotent:
 ```
 
 `edge-nginx` teilt ausschließlich diesen dedizierten Edge-Netzwerk-Namespace,
-nicht den von wg-easy. Nur der kleine Namespace-Halter erhält `NET_ADMIN`; Nginx
-erhält keine Capability. Damit bleibt die Route deklarativ, ohne Hostroute,
-`docker network connect` oder manuelle Runtime-Regel. Dieser Ansatz und die
-effektiven Capabilities müssen vor dem Cutover auf ARM64 isoliert geprüft werden.
+nicht den von wg-easy. Der Namespace-Halter startet als `root`, setzt einmalig
+die Route mit `NET_ADMIN` und wechselt anschließend mit `su-exec` auf den eigens
+angelegten Benutzer `edge-network` (UID/GID 10001). `sleep infinity` hält danach
+als unprivilegierter PID 1 nur den Namespace am Leben. Nginx erhält selbst keine
+Capability.
+
+Compose verwirft zunächst alle Capabilities. `NET_ADMIN` wird nur zum Setzen der
+Route benötigt; `SETUID` und `SETGID` ermöglichen ausschließlich den
+Privilege-Drop durch `su-exec`. `no-new-privileges:true` bleibt aktiv. Nach dem
+Wechsel werden für PID 1 `CapPrm = 0`, `CapEff = 0` und `NoNewPrivs = 1`
+erwartet. Damit bleibt die Route deklarativ, ohne Hostroute,
+`docker network connect` oder manuelle Runtime-Regel. Diese Werte und der
+Fortbestand der Route müssen vor dem Cutover auf ARM64 gemessen werden.
 
 ## Incoming
 
@@ -138,6 +152,13 @@ Nginx lädt wie bisher alle sechs Stunden neu. Vor dem Test sind Dateirechte,
 Renewal-Konfiguration, Zertifikatsnamen und die sichere Reload-Kopplung zu
 validieren. In diesem Schritt wird kein Zertifikat ausgestellt oder erneuert.
 
+Der Certbot-Service liegt bewusst im Compose-Profil `certbot`. Ein normaler
+paralleler Edge-Test startet daher ausschließlich `edge-network` und
+`edge-nginx`; Certbot wird nicht automatisch gestartet und kann kein
+produktives `certbot renew` auslösen. Vorhandene produktive Zertifikate dürfen
+für Nginx nur über einen bewusst gewählten read-only Runtime-Mount verwendet
+werden. Certbot wird erst separat oder beim kontrollierten Cutover aktiviert.
+
 ## Testmodus und Cutover-Modus
 
 Dieselbe Compose-/Nginx-Konfiguration wird in beiden Modi verwendet. Nur die
@@ -157,11 +178,12 @@ Git.
 ## Lokales `.env`-Modell
 
 `infra-new/edge/.env` enthält ausschließlich lokale Runtime-Konfiguration:
-verifizierte Image-Referenzen, Test- oder Cutover-Ports, Zeitzone, TLS-State,
+die verifizierten, nicht sensitiven Image-Digests, Test- oder Cutover-Ports,
+Zeitzone, TLS-State,
 ACME-Webroot und den Pfad des externen Incoming-Includes. Die Datei wird niemals
-versioniert. `.env.example` enthält nur leere, nicht-sensitive Felder und den
-nicht-sensitiven Zeitzonenwert. Es gibt keine Secretwerte oder realistisch
-aussehenden Dummy-Secrets in Git.
+versioniert. `.env.example` enthält leere lokale Pfad-/Portfelder sowie nur die
+nicht sensitiven Image-Digests und den Zeitzonenwert. Es gibt keine Secretwerte
+oder realistisch aussehenden Dummy-Secrets in Git.
 
 Privilegierte Docker-/root-Benutzer können Environmentwerte sehen. Deshalb
 enthält `.env` keine Zertifikats-Private-Keys oder Auth-Tokens; sie enthält nur
@@ -171,7 +193,8 @@ Pfade zu lokal geschütztem Runtime-State.
 
 Ein späterer isolierter Test benötigt folgende Reihenfolge:
 
-1. Exakte produktive Nginx-/Certbot-Image-Digests und Versionen erfassen.
+1. Die dokumentierten produktiven Nginx-/Certbot-Digests auf dem Zielhost
+   nochmals gegen die lokal verfügbaren Images prüfen.
 2. Testkopien beziehungsweise bewusst isolierte Runtime-Pfade für TLS-State,
    ACME-Webroot und Incoming-Include vorbereiten.
 3. Bestehendes `edge-net`, `ops-net`, wg-easy `172.30.90.2` und seine NAT-Regel
@@ -179,14 +202,18 @@ Ein späterer isolierter Test benötigt folgende Reihenfolge:
 4. Authelia, WebSSH und — sobald konfiguriert — code-server im `edge-net`
    bereitstellen. Incoming muss vor dem Nginx-Konfigurationstest ebenfalls am
    `edge-net` hängen, da Nginx Upstreamnamen beim Start auflöst.
-5. `edge-network` mit den drei Testports starten und Route sowie Capability-Set
-   prüfen.
-6. Nginx mit Test-TLS-State starten und `nginx -t` ausführen.
-7. HTTP-Redirect, ACME-Webroot, TLS, alle virtuellen Hosts, Authelia-Verhalten,
+5. Ausschließlich `edge-network` und `edge-nginx` mit den drei Testports starten;
+   das Profil `certbot` bleibt deaktiviert.
+6. Für PID 1 von `edge-network` UID/GID ungleich 0, `CapPrm = 0`, `CapEff = 0`
+   und `NoNewPrivs = 1` messen; zugleich muss `ip route` weiterhin
+   `100.64.0.0/24 via 172.30.90.2` enthalten.
+7. Nginx mit read-only Test- beziehungsweise bewusst bereitgestelltem TLS-State
+   starten und `nginx -t` ausführen.
+8. HTTP-Redirect, ACME-Webroot, TLS, alle virtuellen Hosts, Authelia-Verhalten,
    WebSockets, direkte Pi-Upstreams, Incoming und MQTT Ende-zu-Ende testen.
-8. Certbot-Konfiguration zunächst nur read-only inspizieren; Renewal erst in
+9. Certbot-Konfiguration zunächst nur read-only inspizieren; Renewal erst in
    einem ausdrücklich freigegebenen separaten Test prüfen.
-9. Sicherstellen, dass keine produktiven Ports, Zertifikate oder Backends
+10. Sicherstellen, dass keine produktiven Ports, Zertifikate oder Backends
    verändert wurden und alle Testcontainer/-ports rückstandsfrei entfernen.
 
 ## Security und GitGuardian
@@ -198,7 +225,9 @@ Ein späterer isolierter Test benötigt folgende Reihenfolge:
 - Keine Secrets, Zertifikatsdateien, privaten Schlüssel oder realistisch
   aussehenden Dummywerte im Git.
 - Sensitive Incoming-Konfiguration bleibt eine externe, ignorierte Runtime-Datei.
-- Image- und Portwerte stehen nur in der ignorierten lokalen `.env`.
+- Die verifizierten Image-Digests sind nicht sensitiv und dürfen in
+  `.env.example` und Compose stehen; lokale Port- und Pfadwerte bleiben in der
+  ignorierten `.env`.
 
 ## Rollback
 

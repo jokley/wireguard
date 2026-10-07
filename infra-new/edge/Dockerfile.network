@@ -1,6 +1,9 @@
 FROM arm64v8/alpine:3.22.1
 
-RUN apk add --no-cache iproute2
+RUN apk add --no-cache iproute2 su-exec \
+    && addgroup -S -g 10001 edge-network \
+    && adduser -S -D -u 10001 -h /home/edge-network -s /sbin/nologin \
+        -G edge-network edge-network
 
 COPY scripts/network-entrypoint.sh /usr/local/bin/network-entrypoint.sh
 RUN chmod 0755 /usr/local/bin/network-entrypoint.sh
