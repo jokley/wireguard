@@ -9,9 +9,8 @@ services:
     image: infra-code-server:4.139.1
     container_name: code-server
     restart: unless-stopped
-    environment:
-      TZ: ${TZ:-Europe/Vienna}
-      PASSWORD: ${CODE_SERVER_PASSWORD:?Set CODE_SERVER_PASSWORD in a local .env file}
+    env_file:
+      - .env
     command:
       - --bind-addr
       - 0.0.0.0:8080

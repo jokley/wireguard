@@ -153,8 +153,13 @@ dennoch ein möglicher späterer Hardening-Punkt.
 
 code-server startet mit der unterstützten Authentifizierungsart `password`. Das
 Passwort kommt ausschließlich aus `CODE_SERVER_PASSWORD` in einer nicht
-versionierten lokalen `.env`; Compose bricht bei einem fehlenden Wert ab. Die
-Beispieldatei enthält kein Secret. `auth: none` wird nicht aktiviert.
+versionierten lokalen `.env`, die Compose über `env_file` lädt. Der
+Route-Wrapper prüft die Variable, bildet sie erst im Containerprozess auf das
+von code-server erwartete `PASSWORD` ab und entfernt anschließend den
+anwendungsspezifischen Quellnamen. Dadurch steht in der versionierten
+Compose-Datei keine passwordartige Wertzuweisung. Die Beispieldatei enthält für
+den sensitiven Wert ausschließlich eine leere Zuweisung. `auth: none` wird nicht
+aktiviert.
 
 Später schützt zusätzlich Edge/Nginx mit Authelia den Zugriff. Erst nach einer
 bewussten Sicherheitsfreigabe und bestätigter Netzwerkisolation kann entschieden
@@ -164,7 +169,7 @@ dem Edge vertraut. Bis dahin bleibt die interne Passwortprüfung aktiv.
 ## Config, Secrets und State
 
 - **CONFIG:** `docker-compose.yml`, `Dockerfile`, `route-entrypoint.sh`, README
-  und `.env.example` werden versioniert.
+  sowie `.env.example` und `.gitignore` werden versioniert.
 - **SECRETS:** code-server-Passwort und private SSH-Schlüssel gehören niemals ins
   Git. Es werden standardmäßig keine SSH-Schlüssel gemountet.
 - **STATE:** Extensions, Benutzerdaten und Einstellungen liegen unter
@@ -172,6 +177,17 @@ dem Edge vertraut. Bis dahin bleibt die interne Passwortprüfung aktiv.
   `${CODE_SERVER_STATE_DIR:-./state/code-server}` persistent eingebunden. Das
   Verzeichnis ist durch die übergeordnete `.gitignore` ausgeschlossen. Dieses
   Skeleton erzeugt oder verändert noch keinen Host-State.
+
+### Lokales `.env`-Modell
+
+Runtime-Konfiguration und code-server-Passwort liegen gemeinsam in
+`infra-new/code/.env`. Diese Datei wird niemals versioniert; `.env.example`
+enthält keine Secret-Werte und keine semantischen Fake-Secrets. Das vereinfachte
+Modell ist eine bewusste Entscheidung für diesen einzelnen administrierten
+Infrastrukturserver. Der Trade-off: Privilegierte Docker- beziehungsweise
+root-Benutzer können Container-Environmentwerte weiterhin inspizieren. Die
+lokale Datei benötigt daher restriktive Dateirechte und darf nicht in Logs,
+Supportausgaben oder Backups ohne entsprechenden Schutz gelangen.
 
 ## Voraussetzungen für einen ersten Test
 

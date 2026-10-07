@@ -39,7 +39,7 @@ authelia/authelia@sha256:e325963609cc928861ffe8130c09111862df88dd8fcafbcd2c47e5f
 Die verifizierte Image-ID ist im Migrationsprotokoll als
 `sha256:1fa2233464a981db60022ef837a968c4ed1f89fbc0fd5ccec0f6b475bcb2ab45`
 festgehalten. Compose und `.env.example` verwenden den RepoDigest statt
-`latest`; ein lokaler `AUTHELIA_IMAGE`-Wert kann ihn nur für einen bewusst
+`latest`; ein lokaler `AUTH_IMAGE`-Wert kann ihn nur für einen bewusst
 geprüften Test überschreiben. Beim Infrastruktur-Cutover findet kein
 Authelia-Upgrade statt.
 
@@ -79,7 +79,7 @@ Laufzeit injiziert.
 Das File-Backend erwartet `/users/users_database.yml`. Eine solche Datei kann
 Passwort-Hashes, Gruppen und personenbezogene Angaben enthalten. Sie wird daher
 nicht in den neuen Git-Tree kopiert. Das dedizierte Verzeichnis
-`AUTHELIA_USERS_DATABASE_DIR` wird nach `/users` gemountet. Es ist absichtlich
+`AUTH_USERS_DIR` wird nach `/users` gemountet. Es ist absichtlich
 minimal schreibbar: Der bestehende Reset-Password-Flow kann die User-Datei
 aktualisieren und Implementierungen können dafür eine temporäre Datei mit
 anschließendem atomarem Rename im selben Verzeichnis benötigen. Ein read-only
@@ -90,7 +90,7 @@ Besitzer und Backup sind vor dem Cutover zu prüfen.
 ### STATE
 
 Die bestehende Architektur verwendet lokales SQLite. Der neue Config-Pfad ist
-`/state/db.sqlite3`; `${AUTHELIA_STATE_DIR:-./state}` wird persistent nach
+`/state/db.sqlite3`; `${AUTH_STATE_DIR:-./state}` wird persistent nach
 `/state` gemountet und durch `.gitignore` ausgeschlossen. Es wird keine neue
 Datenbank erfunden oder initialisiert. Vor dem Cutover sind konsistentes Backup,
 Dateirechte, Eigentümer, Migration der vorhandenen SQLite-Datei und Restore-Test
@@ -98,38 +98,41 @@ separat zu planen.
 
 ### SECRETS
 
-Compose stellt die erforderlichen Werte als read-only Dateien unter
-`/run/secrets/` bereit und verweist über die von Authelia unterstützten
-`*_FILE`-Variablen darauf. Vorgesehen sind ausschließlich lokale Dateien für:
+Eine einzige lokale `infra-new/auth/.env` enthält sämtliche Runtime-Konfiguration
+und die fünf sensitiven Authelia-Werte für:
 
 - Reset-Password/JWT,
 - Session,
 - Storage-Verschlüsselung und
-- SMTP-Authentifizierung.
+- SMTP-Benutzername und -Passwort.
 
-Die Hostpfade und `AUTHELIA_NOTIFIER_SMTP_USERNAME` werden lokal in `.env`
-gesetzt. Weder die Dateien noch ihre Inhalte werden versioniert. Ob die
-verifizierte Produktionsversion alle verwendeten `*_FILE`-Variablennamen
-unterstützt, wird im isolierten v4.39.1-Test nochmals validiert.
+Compose lädt diese Datei über `env_file`; die sensitiven Werte stehen weder in
+Compose noch in `configuration.yml`. `.env` wird nicht versioniert und muss
+lokal mit restriktiven Dateirechten angelegt werden.
 
 Die Legacy-Namen `JWT_SECRET` und `SESSION_SECRET` werden nicht übernommen. Der
 neue Stack verwendet ausschließlich die offiziellen hierarchischen
 Authelia-v4.39.1-Variablennamen. Wegen der Priorität Secrets > Environment >
-Files sind die vier Secret-Felder aus `configuration.yml` entfernt und werden
-weder zusätzlich als normale `AUTHELIA_*`-Werte noch unter Legacy-Namen gesetzt.
-Jedes Secret besitzt genau eine FILE-basierte Laufzeitquelle.
+Files sind die fünf sensitiven Felder aus `configuration.yml` entfernt und
+werden nicht zusätzlich unter Legacy-Namen oder über Docker-Compose-Secrets
+gesetzt. Jeder Wert besitzt genau eine Quelle: die lokale `.env`.
+
+Dieses vereinfachte Modell ist für den einzelnen administrierten
+Infrastrukturserver bewusst gewählt. Die Werte liegen nicht in Git oder
+`.env.example`, können aber von privilegierten Docker- beziehungsweise
+root-Benutzern über das Container-Environment eingesehen werden. Diese
+Zugriffsmöglichkeit ist der akzeptierte Trade-off gegenüber separaten
+Secret-Dateien.
 
 ## Secret Handling / GitGuardian
 
 - Secrets gehören niemals ins Git.
 - Es werden keine realistisch aussehenden Dummy-Secrets verwendet.
-- `.env.example` enthält keine Secret-Werte, sondern nur nicht-sensitive Werte
-  und lokale Dateipfade.
-- FILE-basierte Übergabe wird bevorzugt; README und Compose zeigen keine
-  Secret-Inhalte.
-- `.env`, lokale Secret-Dateien, User-Datei und State müssen ignored bleiben.
-- Lokale Marker wie `SET_ME_LOCALLY` sind bewusst semantisch und keine
-  Zugangsdaten.
+- `.env.example` enthält bei sensitiven Variablen ausschließlich leere Werte.
+- README und Compose zeigen keine Secret-Inhalte oder Fake-Secrets.
+- `.env`, User-Datei und State müssen ignored bleiben.
+- Die früheren passwordartigen Compose-Ausdrücke und Secret-Dateipfade wurden
+  entfernt, statt eine GitGuardian-Ausnahme zu konfigurieren.
 
 ## Healthcheck und Security
 
@@ -167,8 +170,8 @@ Nginx, Domains, Cookies und Policies bleiben in diesem Schritt unverändert.
 
 1. Den dokumentierten RepoDigest vor dem Test nochmals gegen die lokale
    v4.39.1-Image-ID und Architektur `arm64` prüfen.
-2. Unterstützung und Priorität der vier `*_FILE`-Variablen für genau v4.39.1
-   bestätigen und nachweisen, dass keine doppelte Secret-Quelle existiert.
+2. Für genau v4.39.1 bestätigen, dass alle fünf offiziellen Environment-
+   Variablen wirksam sind und keine doppelte Secret-Quelle existiert.
 3. Image-Healthcheck inspizieren und einen lokalen, tatsächlich erfolgreichen
    Check festlegen.
 4. User-Datei und SQLite konsistent sichern; Dateirechte und Restore prüfen.
