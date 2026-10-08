@@ -1,0 +1,33 @@
+# Local environment files may contain credentials or host-specific paths.
+.env
+.env.*
+!.env.example
+
+# Secrets and private key material must never be committed.
+secrets/
+**/secrets/
+*.key
+*.pem
+*.p12
+*.pfx
+id_rsa*
+id_ed25519*
+
+# Persistent runtime state belongs outside Git.
+state/
+**/state/
+data/
+**/data/
+*.sqlite
+*.sqlite3
+*.db
+
+# Certificate/account state is persistent and may contain private keys.
+**/letsencrypt/
+**/acme/
+
+# Local overrides and transient files.
+docker-compose.override.yml
+*.log
+*.swp
+.DS_Store

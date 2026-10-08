@@ -1,0 +1,11 @@
+.env
+.env.*
+!.env.example
+
+runtime/
+letsencrypt/
+certbot-webroot/
+*.pem
+*.key
+*.p12
+*.pfx
