@@ -79,8 +79,11 @@ services:
 
 networks:
   edge-net:
-    external: true
     name: edge-net
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.30.91.0/24
   ops-net:
     external: true
     name: ops-net

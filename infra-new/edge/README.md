@@ -92,13 +92,24 @@ unverändert. Policies werden nicht im Edge verändert.
 
 ## Netzwerke und reproduzierbare Pi-Route
 
-`edge-net` (`172.30.91.0/24`) und `ops-net` (`172.30.90.0/24`) werden beide als
-extern referenziert und von diesem Stack nicht erzeugt. `ops-net` ist zwingend,
-weil die aktiven HTTP-Upstreams `100.64.0.2` bis `100.64.0.11`, das wg-easy-UI
-und MQTT weiterhin erreichbar sein müssen.
+Die Netzwerk-Ownership ist eindeutig aufgeteilt:
 
-Ein minimaler `edge-network`-Dienst besitzt beide Netze, veröffentlicht die drei
-Edge-Ports und setzt in seinem eigenen Namespace idempotent:
+- Der WireGuard-Stack besitzt und erzeugt `ops-net` mit
+  `172.30.90.0/24`. Der Edge-Stack konsumiert dieses Netz weiterhin als externes
+  Netz.
+- Der Edge-Stack besitzt und erzeugt `edge-net` mit `172.30.91.0/24`
+  deklarativ als Bridge-Netz.
+- Auth, Code, WebSSH und Incoming besitzen `edge-net` nicht. Sie konsumieren es
+  in ihren jeweiligen Stacks als externes Netz.
+
+`ops-net` ist für den Edge zwingend, weil die aktiven HTTP-Upstreams
+`100.64.0.2` bis `100.64.0.11`, das wg-easy-UI und MQTT weiterhin erreichbar
+sein müssen. Der Dienst `edge-network` bleibt sowohl mit `edge-net` als auch mit
+`ops-net` verbunden; sein Alias `edge-nginx` im `edge-net` bleibt bestehen.
+
+Ein minimaler `edge-network`-Dienst ist an beide Netze angeschlossen,
+veröffentlicht die drei Edge-Ports und setzt in seinem eigenen Namespace
+idempotent:
 
 ```text
 100.64.0.0/24 via 172.30.90.2
@@ -234,29 +245,42 @@ Pfade zu lokal geschütztem Runtime-State.
 
 ## Startreihenfolge und Runtime-Testplan
 
-Ein späterer isolierter Test benötigt folgende Reihenfolge:
+Die deklarative Startreihenfolge beim Cutover ist:
+
+1. Der WireGuard-Stack startet und erzeugt sein `ops-net`
+   (`172.30.90.0/24`).
+2. `edge-network` wird aus dem Edge-Stack gestartet. Compose erzeugt dabei das
+   dem Edge-Stack gehörende `edge-net` (`172.30.91.0/24`).
+3. Auth, WebSSH, Code und Incoming können anschließend das vorhandene
+   `edge-net` extern konsumieren.
+4. `edge-nginx` startet erst danach, sodass seine Service-DNS-Upstreams im
+   `edge-net` auflösbar sind.
+
+Ein späterer isolierter Test umfasst danach folgende Schritte:
 
 1. Die dokumentierten produktiven Nginx-/Certbot-Digests auf dem Zielhost
    nochmals gegen die lokal verfügbaren Images prüfen.
 2. Testkopien beziehungsweise bewusst isolierte Runtime-Pfade für TLS-State,
    ACME-Webroot und Incoming-Include vorbereiten.
-3. Bestehendes `edge-net`, `ops-net`, wg-easy `172.30.90.2` und seine NAT-Regel
-   prüfen, ohne den aktuellen Testzustand zu verändern.
-4. Authelia, WebSSH und — sobald konfiguriert — code-server im `edge-net`
+3. Das vom WireGuard-Stack erzeugte `ops-net`, wg-easy `172.30.90.2` und seine
+   NAT-Regel prüfen, ohne den aktuellen Testzustand zu verändern.
+4. `edge-network` starten und damit `edge-net` deklarativ erzeugen.
+5. Authelia, WebSSH und — sobald konfiguriert — code-server im `edge-net`
    bereitstellen. Incoming muss vor dem Nginx-Konfigurationstest ebenfalls am
    `edge-net` hängen, da Nginx Upstreamnamen beim Start auflöst.
-5. Ausschließlich `edge-network` und `edge-nginx` mit den drei Testports starten;
-   das Profil `certbot` bleibt deaktiviert.
-6. Für PID 1 von `edge-network` UID/GID ungleich 0, `CapPrm = 0`, `CapEff = 0`
+6. Ausschließlich `edge-nginx` zusätzlich starten und über die drei bereits von
+   `edge-network` veröffentlichten Testports prüfen; das Profil `certbot` bleibt
+   deaktiviert.
+7. Für PID 1 von `edge-network` UID/GID ungleich 0, `CapPrm = 0`, `CapEff = 0`
    und `NoNewPrivs = 1` messen; zugleich muss `ip route` weiterhin
    `100.64.0.0/24 via 172.30.90.2` enthalten.
-7. Nginx mit read-only Test- beziehungsweise bewusst bereitgestelltem TLS-State
+8. Nginx mit read-only Test- beziehungsweise bewusst bereitgestelltem TLS-State
    starten und `nginx -t` ausführen.
-8. HTTP-Redirect, ACME-Webroot, TLS, alle virtuellen Hosts, Authelia-Verhalten,
+9. HTTP-Redirect, ACME-Webroot, TLS, alle virtuellen Hosts, Authelia-Verhalten,
    WebSockets, direkte Pi-Upstreams, Incoming und MQTT Ende-zu-Ende testen.
-9. Certbot-Konfiguration zunächst nur read-only inspizieren; Renewal erst in
+10. Certbot-Konfiguration zunächst nur read-only inspizieren; Renewal erst in
    einem ausdrücklich freigegebenen separaten Test prüfen.
-10. Sicherstellen, dass keine produktiven Ports, Zertifikate oder Backends
+11. Sicherstellen, dass keine produktiven Ports, Zertifikate oder Backends
    verändert wurden und alle Testcontainer/-ports rückstandsfrei entfernen.
 
 ## Security und GitGuardian
