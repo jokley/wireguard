@@ -1,4 +1,53 @@
-# Eigenständiger Edge-Stack: Migrationskandidat
+# Edge-Infrastruktur
+
+## Administrative Subdomains und Landingpage (vorbereitet, nicht deployt)
+
+Der neue Stack ist laut Betriebsstand bereits produktiv migriert. Die folgenden
+älteren Migrationsabschnitte dokumentieren den historischen Aufbau und sind
+keine aktuelle Deployment-Anweisung.
+
+| Ziel | Routing nach separater Aktivierung |
+| --- | --- |
+| `me.jokley.at` | statische Landingpage |
+| `code.jokley.at` | Authelia → `code-server:8080` |
+| `ssh.jokley.at` | Authelia → `webssh:8080` |
+| `wg.jokley.at` | Authelia → `wg-easy:51821` |
+| `incoming.jokley.at` | bestehender Incoming-Pfad (unverändert) |
+
+Bisher führte `me.jokley.at/webssh/` mit Authelia zu WebSSH und `/` ohne
+Authelia zu wg-easy. Die Repo-Konfiguration ersetzt diese beiden Routen durch
+`landing/index.html`. Der read-only Compose-Mount stellt das Verzeichnis unter
+`/var/www/landing` bereit. TLS, HTTP-Redirect und die drei bisherigen
+Security-Header bleiben erhalten; die Landingpage benötigt kein Authelia.
+Sie enthält ausschließlich öffentliche HTTPS-Links, HTML und eingebettetes CSS.
+Die alten me-Pfade für Auth/WebSSH werden nicht mehr angeboten.
+
+Die neuen TLS-VHosts liegen unter `nginx/vhosts-available/`. Es gibt absichtlich
+keinen Include darauf in `nginx.conf` und keinen Mount dieses Verzeichnisses.
+Damit werden weder die neuen Zertifikatspfade noch neue Upstreams beim aktuellen
+Nginx-Start geladen. Keine Dummy- oder fremden Zertifikate werden verwendet.
+Jeder VHost verwendet die bestehenden Includes `authelia.conf` und
+`authelia-authrequest.conf`, den vorhandenen Login-Redirect sowie HTTP/1.1,
+WebSocket-Upgrade und die üblichen Proxy-Header. Das Code-Server-Passwort bleibt
+zusätzlich aktiv; dessen Konfiguration wird nicht verändert.
+
+51821 bleibt ausschließlich intern. Code und WebSSH haben keine öffentlichen
+Host-Ports; alle Admin-Webdienste laufen über Edge HTTPS. Es werden keine
+Portfreigaben oder Service-/WireGuard-Konfigurationen verändert.
+
+DNS, Zertifikate und Aktivierung erfolgen in einem separaten kontrollierten
+Schritt. Dabei zunächst die bestehende Authelia-Policy und Cookie-Gültigkeit für
+die neuen Domains prüfen, DNS und Zertifikate bereitstellen und die exakten
+`fullchain.pem`-/`privkey.pem`-Pfade je Domain prüfen. Erst danach die ausgewählten
+VHosts read-only in den Container einbinden und explizit im `http`-Kontext
+inkludieren. Der zentrale HTTP-/ACME-Server bleibt unverändert. Vor Aktivierung
+sind ein echtes `nginx -t`, Authelia- und WebSocket-Tests erforderlich.
+Die Landingpage benötigt beim späteren Deployment den neuen Compose-Mount;
+ein bloßer Reload der bisherigen Container-Mounts genügt dafür nicht.
+Dieser Änderungsschritt führt keinerlei Deployment oder Runtime-Befehl aus.
+
+## Historische Migrationsdokumentation
+
 
 Dieser Stack bereitet Nginx und Certbot als eigenständigen öffentlichen Edge
 vor. Er ist nicht deployt. Der produktive Root-Stack, der laufende Edge, die
