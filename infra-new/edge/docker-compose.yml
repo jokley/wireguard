@@ -39,6 +39,10 @@ services:
         target: /etc/nginx/nginx.conf
         read_only: true
       - type: bind
+        source: ./landing
+        target: /var/www/landing
+        read_only: true
+      - type: bind
         source: ./nginx/includes
         target: /etc/nginx/includes
         read_only: true
