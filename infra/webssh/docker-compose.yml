@@ -5,7 +5,7 @@ services:
     build:
       context: .
     image: infra-webssh:test
-    container_name: webssh-new
+    container_name: webssh
     restart: unless-stopped
     command:
       - --address=0.0.0.0

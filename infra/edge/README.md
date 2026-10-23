@@ -1,3 +1,8 @@
+> Aktueller Stand: Dieser Stack unter `infra/` ist produktiv. Die finale
+> Struktur, Container-Namen, Domains und Netzwerke stehen in [der Übersicht](../README.md).
+> Die nachfolgenden Migrations-/Testangaben dokumentieren frühere Schritte und
+> sind keine aktuelle Deployment-Anweisung. Dieser Cleanup verändert keine Runtime.
+
 # Edge-Infrastruktur
 
 ## Administrative Subdomains und Landingpage (im Repo aktiviert, nicht deployt)
@@ -57,7 +62,7 @@ Runtime-, Docker-, Certbot- oder DNS-Befehl aus.
 
 Dieser Stack bereitet Nginx und Certbot als eigenständigen öffentlichen Edge
 vor. Er ist nicht deployt. Der produktive Root-Stack, der laufende Edge, die
-bereits vorhandenen Testnetze und `authelia-new` bleiben unangetastet.
+bereits vorhandenen Testnetze und `authelia` bleiben unangetastet.
 
 ## Analysierte Legacy-Architektur
 
@@ -286,7 +291,7 @@ Git.
 
 ## Lokales `.env`-Modell
 
-`infra-new/edge/.env` enthält ausschließlich lokale Runtime-Konfiguration:
+`infra/edge/.env` enthält ausschließlich lokale Runtime-Konfiguration:
 die verifizierten, nicht sensitiven Image-Digests, Test- oder Cutover-Ports,
 Zeitzone, TLS-State,
 ACME-Webroot und den Pfad des externen Incoming-Includes. Die Datei wird niemals

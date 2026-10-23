@@ -1,3 +1,8 @@
+> Aktueller Stand: Dieser Stack unter `infra/` ist produktiv. Die finale
+> Struktur, Container-Namen, Domains und Netzwerke stehen in [der Übersicht](../README.md).
+> Die nachfolgenden Migrations-/Testangaben dokumentieren frühere Schritte und
+> sind keine aktuelle Deployment-Anweisung. Dieser Cleanup verändert keine Runtime.
+
 # Code-Server-Stack: vorbereiteter Migrationskandidat
 
 Dieser eigenständige Stack stellt später eine zentrale browserbasierte
@@ -211,7 +216,7 @@ nicht erklärt; das laufende Image wurde in diesem Schritt nicht untersucht.
 ### Lokales `.env`-Modell
 
 Runtime-Konfiguration und code-server-Passwort liegen gemeinsam in
-`infra-new/code/.env`. Diese Datei wird niemals versioniert; `.env.example`
+`infra/code/.env`. Diese Datei wird niemals versioniert; `.env.example`
 enthält keine Secret-Werte und keine semantischen Fake-Secrets. Das vereinfachte
 Modell ist eine bewusste Entscheidung für diesen einzelnen administrierten
 Infrastrukturserver. Der Trade-off: Privilegierte Docker- beziehungsweise
