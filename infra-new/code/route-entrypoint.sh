@@ -9,6 +9,12 @@ if [ "$(id -u)" -ne 0 ]; then
   exit 1
 fi
 
+# Never let code-server generate a password-bearing fallback configuration.
+if [ ! -r /etc/code-server/config.yaml ]; then
+  echo "route-entrypoint: required non-sensitive config is missing or unreadable" >&2
+  exit 1
+fi
+
 # `replace` is idempotent and modifies only this container's network namespace.
 ip -4 route replace "${peer_subnet}" via "${wireguard_gateway}"
 
@@ -21,6 +27,9 @@ fi
 # map the local variable only in memory, and remove the source name afterwards.
 code_server_password="${CODE_SERVER_PASSWORD}"
 unset CODE_SERVER_PASSWORD
+# A hashed credential would take precedence over PASSWORD. The explicit CLI
+# config selects the image-owned, non-sensitive file instead of a home config.
+unset HASHED_PASSWORD CODE_SERVER_CONFIG
 export PASSWORD="${code_server_password}"
 unset code_server_password
 

@@ -12,6 +12,8 @@ services:
     env_file:
       - .env
     command:
+      - --config
+      - /etc/code-server/config.yaml
       - --bind-addr
       - 0.0.0.0:8080
       - --auth

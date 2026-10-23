@@ -13,6 +13,9 @@ RUN apt-get update \
         openssh-client \
     && rm -rf /var/lib/apt/lists/*
 
+COPY config.yaml /etc/code-server/config.yaml
+RUN chmod 0755 /etc/code-server && chmod 0644 /etc/code-server/config.yaml
+
 COPY route-entrypoint.sh /usr/local/bin/route-entrypoint.sh
 RUN chmod 0755 /usr/local/bin/route-entrypoint.sh
 
