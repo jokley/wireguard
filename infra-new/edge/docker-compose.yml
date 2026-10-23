@@ -43,6 +43,14 @@ services:
         target: /var/www/landing
         read_only: true
       - type: bind
+        source: ./nginx/vhosts-available
+        target: /etc/nginx/vhosts-available
+        read_only: true
+      - type: bind
+        source: ./nginx/vhosts-enabled
+        target: /etc/nginx/vhosts-enabled
+        read_only: true
+      - type: bind
         source: ./nginx/includes
         target: /etc/nginx/includes
         read_only: true
