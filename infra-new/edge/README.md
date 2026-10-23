@@ -1,12 +1,12 @@
 # Edge-Infrastruktur
 
-## Administrative Subdomains und Landingpage (vorbereitet, nicht deployt)
+## Administrative Subdomains und Landingpage (im Repo aktiviert, nicht deployt)
 
 Der neue Stack ist laut Betriebsstand bereits produktiv migriert. Die folgenden
 älteren Migrationsabschnitte dokumentieren den historischen Aufbau und sind
 keine aktuelle Deployment-Anweisung.
 
-| Ziel | Routing nach separater Aktivierung |
+| Ziel | Konfiguriertes Routing |
 | --- | --- |
 | `me.jokley.at` | statische Landingpage |
 | `code.jokley.at` | Authelia → `code-server:8080` |
@@ -22,10 +22,13 @@ Security-Header bleiben erhalten; die Landingpage benötigt kein Authelia.
 Sie enthält ausschließlich öffentliche HTTPS-Links, HTML und eingebettetes CSS.
 Die alten me-Pfade für Auth/WebSSH werden nicht mehr angeboten.
 
-Die neuen TLS-VHosts liegen unter `nginx/vhosts-available/`. Es gibt absichtlich
-keinen Include darauf in `nginx.conf` und keinen Mount dieses Verzeichnisses.
-Damit werden weder die neuen Zertifikatspfade noch neue Upstreams beim aktuellen
-Nginx-Start geladen. Keine Dummy- oder fremden Zertifikate werden verwendet.
+Die drei Admin-TLS-VHosts liegen als einzige Konfigurationsquelle unter
+`nginx/vhosts-available/`. Relative Symlinks in `nginx/vhosts-enabled/` aktivieren
+sie über `include /etc/nginx/vhosts-enabled/*.conf;` im `http`-Kontext.
+Beide Verzeichnisse werden unter denselben benachbarten Pfaden read-only nach
+`/etc/nginx/` gemountet; dadurch bleiben die relativen Symlinks im Container gültig.
+Zum späteren Deaktivieren nur den jeweiligen Symlink entfernen, nicht die Quelle.
+
 Jeder VHost verwendet die bestehenden Includes `authelia.conf` und
 `authelia-authrequest.conf`, den vorhandenen Login-Redirect sowie HTTP/1.1,
 WebSocket-Upgrade und die üblichen Proxy-Header. Das Code-Server-Passwort bleibt
@@ -35,16 +38,19 @@ zusätzlich aktiv; dessen Konfiguration wird nicht verändert.
 Host-Ports; alle Admin-Webdienste laufen über Edge HTTPS. Es werden keine
 Portfreigaben oder Service-/WireGuard-Konfigurationen verändert.
 
-DNS, Zertifikate und Aktivierung erfolgen in einem separaten kontrollierten
-Schritt. Dabei zunächst die bestehende Authelia-Policy und Cookie-Gültigkeit für
-die neuen Domains prüfen, DNS und Zertifikate bereitstellen und die exakten
-`fullchain.pem`-/`privkey.pem`-Pfade je Domain prüfen. Erst danach die ausgewählten
-VHosts read-only in den Container einbinden und explizit im `http`-Kontext
-inkludieren. Der zentrale HTTP-/ACME-Server bleibt unverändert. Vor Aktivierung
-sind ein echtes `nginx -t`, Authelia- und WebSocket-Tests erforderlich.
-Die Landingpage benötigt beim späteren Deployment den neuen Compose-Mount;
-ein bloßer Reload der bisherigen Container-Mounts genügt dafür nicht.
-Dieser Änderungsschritt führt keinerlei Deployment oder Runtime-Befehl aus.
+DNS und die Zertifikate sind laut Betriebsstand vorhanden. Die aktiven VHosts
+verwenden je Domain `/etc/letsencrypt/live/<domain>/fullchain.pem` und
+`/etc/letsencrypt/live/<domain>/privkey.pem`. Diese Dateien sind externer
+Runtime-State und werden weder ins Repo kopiert noch hier verändert.
+Der einzige zentrale HTTP-Server bedient als Standardserver auch die neuen
+Hosts: ACME bleibt unverändert, alle anderen HTTP-Pfade leiten auf HTTPS um.
+
+Dies ist ausschließlich eine Aktivierung in der Repo-Konfiguration. Ein späteres
+Deployment muss die neuen VHost-Mounts und den vorhandenen Landingpage-Mount
+bereitstellen; ein bloßer Reload mit den alten Mounts genügt nicht. Vor dem
+Deployment sind auf dem Zielsystem ein echtes `nginx -t` sowie Authelia- und
+WebSocket-Tests erforderlich. Dieser Schritt führt keinerlei Deployment,
+Runtime-, Docker-, Certbot- oder DNS-Befehl aus.
 
 ## Historische Migrationsdokumentation
 
