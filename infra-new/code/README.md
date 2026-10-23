@@ -166,9 +166,39 @@ bewussten Sicherheitsfreigabe und bestätigter Netzwerkisolation kann entschiede
 werden, ob die doppelte Authentifizierung bestehen bleibt oder code-server nur
 dem Edge vertraut. Bis dahin bleibt die interne Passwortprüfung aktiv.
 
+### Genau eine Passwortquelle
+
+Die lokale, gitignored `.env` ist die einzige Passwortquelle. Der Wrapper mappt
+`CODE_SERVER_PASSWORD` ausschließlich zur Laufzeit auf `PASSWORD`, entfernt den
+Quellnamen sowie ein eventuell geerbtes `HASHED_PASSWORD` und `CODE_SERVER_CONFIG`.
+Compose startet weiterhin mit `--auth password` und wählt explizit
+`--config /etc/code-server/config.yaml`.
+
+Die minimale versionierte `config.yaml` enthält nur Bind-Adresse, Auth-Modus und
+`cert: false`, keinerlei Passwort oder Hash. Docker kopiert sie root-eigen mit
+Modus 0644 in ein für coder nicht beschreibbares Verzeichnis. Fehlt sie, bricht
+der Wrapper ab. Damit wird keine zweite Passwortquelle angelegt oder verwendet;
+der persistente Benutzerdaten-Mount bleibt unverändert.
+
+Im Quellcode von code-server 4.139.1 liest `entry.ts` zuerst die Config.
+`cli.ts:readConfigFile` versucht bei fehlender Datei mit `wx` eine Default-Config
+mit Zufallspasswort anzulegen, unabhängig von `PASSWORD`. Eine vorhandene Config
+wird nicht überschrieben. Danach überschreibt `PASSWORD` das Klartextpasswort
+aus der Config; ein `hashed-password` hat Vorrang. Die feste, bereits vorhandene
+Config verhindert die automatische Secret-Datei; das entfernte `HASHED_PASSWORD`
+verhindert eine konkurrierende Environment-Quelle. Eine alte Home-Config wird
+nicht mehr gelesen. Eventuell bestehende Altdateien werden durch diese reine
+Repo-Änderung nicht gelöscht; es findet keine Runtime-Bereinigung statt.
+
+Quellen: [cli.ts (v4.139.1)](https://github.com/coder/code-server/blob/v4.139.1/src/node/cli.ts)
+und [entry.ts (v4.139.1)](https://github.com/coder/code-server/blob/v4.139.1/src/node/entry.ts).
+Ein gesetztes `PASSWORD` müsste laut `main.ts` als Environment-Quelle geloggt
+werden. Die gemeldete Config-Logzeile ist daher durch die Dateierzeugung allein
+nicht erklärt; das laufende Image wurde in diesem Schritt nicht untersucht.
+
 ## Config, Secrets und State
 
-- **CONFIG:** `docker-compose.yml`, `Dockerfile`, `route-entrypoint.sh`, README
+- **CONFIG:** `docker-compose.yml`, `Dockerfile`, `route-entrypoint.sh`, `config.yaml`, README
   sowie `.env.example` und `.gitignore` werden versioniert.
 - **SECRETS:** code-server-Passwort und private SSH-Schlüssel gehören niemals ins
   Git. Es werden standardmäßig keine SSH-Schlüssel gemountet.
