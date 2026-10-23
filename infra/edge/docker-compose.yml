@@ -6,7 +6,7 @@ services:
       context: .
       dockerfile: Dockerfile.network
     image: infra-edge-network:test
-    container_name: edge-network-new
+    container_name: edge-network
     restart: unless-stopped
     ports:
       - "${EDGE_HTTP_PORT:?Set EDGE_HTTP_PORT in .env}:80"
@@ -28,7 +28,7 @@ services:
 
   edge-nginx:
     image: ${EDGE_NGINX_IMAGE:-arm64v8/nginx@sha256:b312465509d25554910dfbf88323ede17eeb159fdc1307a05280e282fe4b47d3}
-    container_name: edge-nginx-new
+    container_name: edge-nginx
     restart: unless-stopped
     network_mode: service:edge-network
     depends_on:
@@ -72,7 +72,7 @@ services:
 
   certbot:
     image: ${EDGE_CERTBOT_IMAGE:-certbot/certbot@sha256:0d9c7c8f71a81fcbc1acb96060194ce9e97a528fa907dcc46a72b8b8d523faab}
-    container_name: edge-certbot-new
+    container_name: edge-certbot
     restart: unless-stopped
     profiles:
       - certbot

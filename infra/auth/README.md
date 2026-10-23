@@ -1,3 +1,8 @@
+> Aktueller Stand: Dieser Stack unter `infra/` ist produktiv. Die finale
+> Struktur, Container-Namen, Domains und Netzwerke stehen in [der Übersicht](../README.md).
+> Die nachfolgenden Migrations-/Testangaben dokumentieren frühere Schritte und
+> sind keine aktuelle Deployment-Anweisung. Dieser Cleanup verändert keine Runtime.
+
 # Eigenständiger Authelia-Stack: Migrationskandidat
 
 Dieser Stack bereitet Authelia als eigenständigen Auth-Service vor. Er ist noch
@@ -98,7 +103,7 @@ separat zu planen.
 
 ### SECRETS
 
-Eine einzige lokale `infra-new/auth/.env` enthält sämtliche Runtime-Konfiguration
+Eine einzige lokale `infra/auth/.env` enthält sämtliche Runtime-Konfiguration
 und die fünf sensitiven Authelia-Werte für:
 
 - Reset-Password/JWT,

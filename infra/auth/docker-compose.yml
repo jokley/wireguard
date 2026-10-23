@@ -3,7 +3,7 @@
 services:
   authelia:
     image: ${AUTH_IMAGE:-authelia/authelia@sha256:e325963609cc928861ffe8130c09111862df88dd8fcafbcd2c47e5ff0a4ae268}
-    container_name: authelia-new
+    container_name: authelia
     restart: unless-stopped
     env_file:
       - .env

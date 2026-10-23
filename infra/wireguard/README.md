@@ -1,3 +1,8 @@
+> Aktueller Stand: Dieser Stack unter `infra/` ist produktiv. Die finale
+> Struktur, Container-Namen, Domains und Netzwerke stehen in [der Übersicht](../README.md).
+> Die nachfolgenden Migrations-/Testangaben dokumentieren frühere Schritte und
+> sind keine aktuelle Deployment-Anweisung. Dieser Cleanup verändert keine Runtime.
+
 # WireGuard-Stack: vorbereiteter Migrationskandidat
 
 Dieser Stack trennt ausschließlich wg-easy aus dem heutigen Root-Stack heraus.
