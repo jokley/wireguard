@@ -1,3 +1,7 @@
 .env
 .env.*
 !.env.example
+
+# Future host-managed SSH configuration and keys; never version runtime state.
+runtime/
+state/

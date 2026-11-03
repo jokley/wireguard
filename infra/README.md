@@ -13,6 +13,7 @@ infra/
 ├── edge/       # Edge, TLS, Reverse Proxy und Landingpage
 ├── auth/       # Authelia
 ├── wireguard/  # VPN und Pi-Transit
+├── dev/        # Owner von dev-net, generische DEV-/TEST-Grundlage
 ├── code/       # Code-Server
 ├── webssh/     # Browser-SSH
 └── shared/     # gemeinsame Architektur- und Netzwerkdokumentation
@@ -26,6 +27,7 @@ infra/
 | auth | authelia | authelia |
 | wireguard | wg-easy | wg-easy |
 | code | code-server | code-server |
+| dev | network-holder | infra-dev-network-holder-1 (Compose-generiert) |
 | webssh | webssh | webssh |
 
 Die laufenden Container werden durch diesen PR nicht umbenannt. Service-Namen,
@@ -78,3 +80,19 @@ oder prüft keinen produktiven Runtime-State.
 
 Die Stack-READMEs enthalten zusätzlich historische Migrations- und Testprotokolle.
 Die aktuelle Struktur und Architektur sind in dieser Übersicht dokumentiert.
+
+## Entwicklungs- und Testplattform (vorbereitet, nicht deployt)
+
+[`dev/`](dev/README.md) verwaltet deklarativ das zusätzliche `dev-net` für
+Code-Server und zukünftige TEST-/QA-Stacks. Bevorzugter Subnetzkandidat ist
+`172.30.92.0/24`; er ist nur gegen die Repo-Netze geprüft. Eine lokale explizite
+Wahl nach Zielhost-Prüfung ist erforderlich. Code-Server konsumiert dev-net
+extern neben seinen unveränderten edge-net-/ops-net-Anbindungen. Keine
+bestehenden PROD-Anwendungsdienste erhalten diese zusätzliche Anbindung.
+Der administrative Code-Server ist der ausdrücklich vorgesehene gemeinsame
+Entwicklungsarbeitsplatz; Edge/Auth/WireGuard/WebSSH bleiben unberührt.
+
+Die [zentralen Projektkonventionen](shared/development.md) beschreiben Server-DEV
+im Code-Server, separate TEST-/PROD-Stacks, Device-Entwicklung per SSH,
+Projekt-Naming, Datenbankmodi, getrennte Secrets und spätere Deployment-Grenzen.
+Keine konkreten Projekte, DBs, Domains, Toolchains oder Deployments werden ergänzt.

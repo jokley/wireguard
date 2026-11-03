@@ -1,5 +1,5 @@
-# Migration candidate only. Both external networks and the WireGuard transit
-# must exist before this stack can be tested.
+# External networks (including dev-net owned by infra/dev) must exist before
+# deployment. No Docker socket or application deployment permissions are granted.
 services:
   code-server:
     build:
@@ -39,8 +39,11 @@ services:
     security_opt:
       - no-new-privileges:true
     networks:
-      - edge-net
-      - ops-net
+      edge-net: {}
+      ops-net: {}
+      dev-net:
+        # Do not let the new development network replace an existing default route.
+        gw_priority: -1
 
 networks:
   edge-net:
@@ -49,3 +52,6 @@ networks:
   ops-net:
     external: true
     name: ops-net
+  dev-net:
+    external: true
+    name: dev-net
