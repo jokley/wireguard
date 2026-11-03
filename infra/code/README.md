@@ -1,3 +1,24 @@
+# Code-Server als LOCAL/DEV und SSH-Arbeitsplatz
+
+Die [Entwicklungs-/Test-Konventionen](../shared/development.md) unterscheiden
+Server-/Docker-Projekte (lokale Prozesse im Code-Server, separater vollständiger
+TEST-Stack) von Device-Projekten (SSH auf DEV-/QA-Geräte). Keine neuen Toolchains,
+SSH-Keys oder Deployment-Werkzeuge werden hier installiert.
+
+Code-Server konsumiert `edge-net`, `ops-net` und zusätzlich das von
+[`infra/dev`](../dev/README.md) verwaltete externe `dev-net`. Keine statische
+Dev-IP. `gw_priority: -1` verhindert, dass dev-net das Standardgateway übernimmt
+(Compose >= 2.33.1 erforderlich). Owner-Netz vor einer späteren Code-Aktivierung
+bereitstellen. Wrapper, Route `100.64.0.0/24 via 172.30.90.2`, User-Drop,
+Authentifizierung, Mounts und Capabilities bleiben unverändert. Keine Host-Ports,
+kein Docker-Socket, kein Docker-in-Docker und keine Host-Docker-Rechte.
+
+Gitignored `runtime/ssh/` ist für spätere read-only Host-Keys/-Config reserviert;
+`state/ssh/` für separat schreibbare known_hosts. Details und Rechte in der
+[SSH-Strategie](../shared/development.md#zukünftige-ssh-einbindung). Es werden
+noch keine SSH-Dateien erzeugt oder gemountet. Bestehende folgende Protokolle
+sind historische Migrationsdokumentation.
+
 > Aktueller Stand: Dieser Stack unter `infra/` ist produktiv. Die finale
 > Struktur, Container-Namen, Domains und Netzwerke stehen in [der Übersicht](../README.md).
 > Die nachfolgenden Migrations-/Testangaben dokumentieren frühere Schritte und

@@ -1,0 +1,25 @@
+# Generic network owner only; no application/test stack is deployed here.
+name: infra-dev
+
+services:
+  network-holder:
+    image: alpine:3.22.1
+    command: ["sleep", "infinity"]
+    user: "65534:65534"
+    restart: unless-stopped
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - dev-net
+
+networks:
+  dev-net:
+    name: dev-net
+    driver: bridge
+    ipam:
+      config:
+        # No default: confirm the target host's Docker/VPN/LAN routes first.
+        - subnet: ${DEV_NET_SUBNET:?Set DEV_NET_SUBNET to a verified free private subnet in infra/dev/.env}
