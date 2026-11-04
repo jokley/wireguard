@@ -369,9 +369,12 @@ den neuen Edge übergeben werden.
 
 `https://test.incoming.jokley.at` → Authelia → `incoming-test-nginx:8080`.
 Nur `group:admin` erhält `one_factor`-Zugriff; `incoming-users` erhält keine
-TEST-Freigabe. Die eigene Cookie-Konfiguration verwendet
-`authelia_session_incoming_test`. PROD-Routing, dessen Session und Access-Control
-bleiben unverändert. Der VHost ist per relativem Symlink in `vhosts-enabled`
+TEST-Freigabe. `test.incoming.jokley.at` verwendet bewusst den bestehenden
+Cookie-Scope `incoming.jokley.at` mit `authelia_session_incoming`. Eine eigene
+Cookie-Domain für die TEST-Subdomain ist nicht zulässig, weil Authelia
+überlappende Cookie-Domains verbietet. Der gemeinsame Session-Scope erweitert
+keine Berechtigungen: Die TEST-Regel bleibt ausschließlich `group:admin`.
+PROD-Routing, dessen Session und Access-Control bleiben unverändert. Der VHost ist per relativem Symlink in `vhosts-enabled`
 aktiviert; HTTP-Redirect und ACME nutzen den unveränderten zentralen HTTP-Server.
 
 TEST `/api/` lädt ausschließlich `/etc/nginx/runtime/incoming-test-secret.conf`.
