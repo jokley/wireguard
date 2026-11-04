@@ -111,6 +111,13 @@ session:
     same_site: lax
     expiration: 3600
 
+  - domain: test.incoming.jokley.at
+    authelia_url: https://test.incoming.jokley.at/auth
+    default_redirection_url: https://test.incoming.jokley.at/
+    name: authelia_session_incoming_test
+    same_site: lax
+    expiration: 3600
+
 authentication_backend:
   file:
     path: "/users/users_database.yml"
@@ -181,6 +188,11 @@ access_control:
     policy: one_factor
     subject:
     - user:Beck
+    - group:admin
+
+  - domain: test.incoming.jokley.at
+    policy: one_factor
+    subject:
     - group:admin
 
   - domain: incoming.jokley.at

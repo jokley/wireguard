@@ -59,6 +59,12 @@ services:
         target: /etc/nginx/runtime/incoming-secret.conf
         read_only: true
       - type: bind
+        source: ${EDGE_INCOMING_TEST_INCLUDE_FILE:?Set EDGE_INCOMING_TEST_INCLUDE_FILE to the local TEST runtime include}
+        target: /etc/nginx/runtime/incoming-test-secret.conf
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
         source: ${LETSENCRYPT_DIR:?Set LETSENCRYPT_DIR in .env}
         target: /etc/letsencrypt
         read_only: true

@@ -364,3 +364,57 @@ entfernt. Die externen Netze, wg-easy, Authelia, Incoming, Zertifikate und der
 Root-Stack bleiben unangetastet. Erst nach einem erfolgreichen End-to-End-Test,
 gesichertem TLS-State und dokumentiertem Rückfallverfahren dürfen 80/443/8883 an
 den neuen Edge übergeben werden.
+
+## Incoming TEST über den zentralen Edge (Repo vorbereitet)
+
+`https://test.incoming.jokley.at` → Authelia → `incoming-test-nginx:8080`.
+Nur `group:admin` erhält `one_factor`-Zugriff; `incoming-users` erhält keine
+TEST-Freigabe. Die eigene Cookie-Konfiguration verwendet
+`authelia_session_incoming_test`. PROD-Routing, dessen Session und Access-Control
+bleiben unverändert. Der VHost ist per relativem Symlink in `vhosts-enabled`
+aktiviert; HTTP-Redirect und ACME nutzen den unveränderten zentralen HTTP-Server.
+
+TEST `/api/` lädt ausschließlich `/etc/nginx/runtime/incoming-test-secret.conf`.
+Der zusätzliche read-only Bind-Mount stammt aus der lokalen Variable
+`EDGE_INCOMING_TEST_INCLUDE_FILE`. Diese zeigt auf eine geschützte Host-Datei,
+z.B. unter dem gitignored Verzeichnis `infra/edge/runtime/`. Der Wert für den
+Header `X-Auth-Proxy-Secret` muss dem lokalen `TEST_AUTH_PROXY_SECRET` des
+Incoming-TEST-Checkouts entsprechen. Weder Wert noch Runtime-Datei gehören ins
+Git. PROD verwendet weiterhin ausschließlich `incoming-secret.conf`.
+Die neue Mount-Variable ist Pflicht; `create_host_path: false` verhindert, dass
+ein fehlender Quellpfad als Verzeichnis angelegt wird.
+
+### Lokale Schritte nach Merge, separat kontrolliert ausführen
+
+1. `EDGE_INCOMING_TEST_INCLUDE_FILE` in der lokalen `infra/edge/.env` setzen.
+2. Die lokale Include-Datei mit einer `proxy_set_header`-Direktive für
+   `X-Auth-Proxy-Secret` bereitstellen; restriktive Hostrechte setzen, keine
+   Secretwerte in Terminalausgaben, Logs oder Git übernehmen.
+3. Den Wert lokal kontrolliert mit `TEST_AUTH_PROXY_SECRET` von Incoming TEST
+   abgleichen. Hier wurden keine Secrets gelesen oder kopiert.
+4. Existenz und Lesbarkeit von `fullchain.pem` und `privkey.pem` unter
+   `/etc/letsencrypt/live/test.incoming.jokley.at/` sicherstellen. Zertifikat
+   separat bereitstellen; dieser PR ruft weder Certbot noch DNS-Werkzeuge auf.
+5. Auf dem Zielsystem die vollständige Authelia-Konfiguration mit den externen
+   Runtime-Werten validieren und Authelia anschließend kontrolliert neu starten,
+   bevor TEST am Edge öffentlich aktiviert wird.
+6. Die vollständige Nginx-Konfiguration mit vorhandenen Runtime-Includes,
+   Zertifikaten und auflösbarem `incoming-test-nginx:8080` per `nginx -t` prüfen.
+   Ein alter Container ohne TEST-Include-Mount kann diese Prüfung noch nicht
+   bestehen; dafür einen separat freigegebenen Validierungsablauf verwenden.
+7. Den neuen Mount bei einem kontrollierten Edge-Recreate übernehmen: Ein Reload
+   allein ergänzt keine Docker-Mounts. Erst nach erfolgreicher Validierung
+   aktivieren. Kein gleichzeitiges Deployment anderer Services.
+8. Browserprüfung: Admin-Login, Seite, API und WebSockets; Nicht-Admins einschließlich
+   `incoming-users` müssen abgewiesen werden. PROD und bestehende Routen prüfen.
+
+Ohne TEST-Zertifikate, Include-Datei oder erreichbaren TEST-Upstream kann die
+aktivierte Konfiguration einen späteren Nginx-Start/Reload verhindern. Deshalb
+alle Voraussetzungen vor der Runtime-Übernahme prüfen; bei Problemen zunächst
+nur den neuen TEST-Symlink deaktivieren und erneut validieren. Das geteilte
+Authelia-Include reserviert `/auth/` und `/static/` wie bei PROD; eine eventuelle
+Kollision mit TEST-App-Pfaden ist im Browsertest zu prüfen. Keine bestehenden
+Includes werden in diesem PR umgebaut.
+
+Nur statische Repo-Änderungen: kein Deployment, Reload, Restart, Recreate,
+Certbot, DNS, WireGuard- oder Incoming-Repository-Eingriff.
