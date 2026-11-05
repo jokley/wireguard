@@ -28,6 +28,10 @@ services:
       - type: bind
         source: ${CODE_SERVER_STATE_DIR:-./state/code-server}
         target: /home/coder/.local/share/code-server
+      - type: volume
+        source: incoming-test-postgres-backups
+        target: /backups
+        read_only: true
     cap_drop:
       - ALL
     cap_add:
@@ -55,3 +59,8 @@ networks:
   dev-net:
     external: true
     name: dev-net
+
+volumes:
+  incoming-test-postgres-backups:
+    external: true
+    name: incoming-test-postgres-backups
