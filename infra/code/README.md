@@ -1,9 +1,60 @@
 # Code-Server als LOCAL/DEV und SSH-Arbeitsplatz
 
+Code-Server ist der LOCAL/DEV-Arbeitsplatz für Next.js, React, Vite, Node.js
+und Flask/Python. Das Image enthält nur die generische Toolchain; Frameworks
+und Projektabhängigkeiten bleiben in den Workspace-Repositories.
+
+## Development-Toolchain
+
+| Werkzeug | Auswahl | Grundlage |
+| --- | --- | --- |
+| Node.js | 24.22.2 LTS | Incoming verlangt `>=22.6`; Node 24 ist eine unterstützte LTS-Linie. |
+| npm | 11.19.1, mit Node gebündelt | Kein separater, ungepinnter npm-Upgrade. |
+| pnpm | 10.30.3 | Incoming `packageManager` und Frontend-Dockerfile. |
+| Python | 3.12.16 mit pip und venv | README empfiehlt 3.12+; bestehender Backend-Container verwendet 3.11. |
+
+Analyse: Die lokalen `/home/Projects`-Checkouts waren hier nicht vorhanden.
+Stattdessen wurden `jokley/incoming` auf `main` und `dev` geprüft:
+[`frontend/package.json`](https://github.com/jokley/incoming/blob/dev/frontend/package.json),
+`frontend/pnpm-lock.yaml`, Frontend-/Backend-Dockerfiles und
+`backend/requirements.txt`. Beide Branches haben dieselben relevanten Deklarationen:
+React 18.3.1, Vite 6.3.5, Node `>=22.6`, pnpm 10.30.3 und Lockfile-Format 9.0;
+Frontend-Build auf Node 22, Backend auf Python 3.11, Flask 3.0.0,
+NumPy 1.26.4 und pandas 2.2.2. Python 3.12 passt zur dokumentierten Empfehlung
+und zu diesen Paketen; Python 3.13 ist wegen NumPy 1.26.4 nicht die gemeinsame
+Basis. An Root/Frontend wurden keine `.nvmrc`/`.node-version` und an Root/Backend
+keine `.python-version` bzw. Backend-`pyproject.toml` gefunden.
+Eine konkrete zusätzliche Next.js-Codebasis konnte nicht verifiziert werden;
+die Next.js-Eignung ist eine generische Node-LTS-Entscheidung, kein Projekttest.
+
+Installation: Multi-Stage-COPY aus `node:24.22.2-trixie-slim` und
+`python:3.12.16-slim-trixie` in das unveränderte Code-Server-4.139.1-Image.
+Alle verwenden Debian 13; ein Build-Check lehnt eine abweichende Zielbasis ab.
+Benötigte Python-Shared-Library-Pakete werden im Python-Stage per `ldd`/dpkg
+ermittelt und über APT installiert, statt fremde Systembibliotheken zu kopieren.
+Python enthält eigene Header, pip, ensurepip und `python3 -m venv` (entspricht
+der benötigten venv-Funktion; kein zusätzliches Debian-`python3-venv` mit einem
+zweiten Interpreter). `build-essential` liefert GCC, G++, Make und libc-Header,
+`pkg-config` die native Library-Erkennung. Keine projektspezifischen DB-SDKs.
+
+Nur pnpm wird global per npm mit fester Version installiert. Keine globalen
+Next-/Vite-/React-/Flask-CLIs, keine Projektinstallation, kein Docker oder Socket.
+APT-Listen und Installationscaches werden entfernt. Versions-Tags sind fest,
+aber nicht per Digest unveränderlich; APT-Security-Pakete folgen Debian trixie.
+Das ist keine Zusage bitidentischer Builds. Toolchain-Pins bei Updates bewusst
+prüfen; bestehende Code-Server-Version, Auth, Route, Mounts und Rechte bleiben.
+
+Projektabhängigkeiten erst im jeweiligen Workspace installieren, für Python
+in einer projektlokalen `.venv` über `python3 -m venv .venv` und deren pip.
+Frameworks über Projekt-Skripte aufrufen. Keine globalen pip-Installationen.
+Der Image-Build prüft Versionen, wichtige Python-Module und venv/pip; diese
+Smoke-Checks wurden in dieser Änderung nicht ausgeführt, da nur statisch
+validiert und kein Image gebaut oder Container verändert wurde.
+
 Die [Entwicklungs-/Test-Konventionen](../shared/development.md) unterscheiden
 Server-/Docker-Projekte (lokale Prozesse im Code-Server, separater vollständiger
-TEST-Stack) von Device-Projekten (SSH auf DEV-/QA-Geräte). Keine neuen Toolchains,
-SSH-Keys oder Deployment-Werkzeuge werden hier installiert.
+TEST-Stack) von Device-Projekten (SSH auf DEV-/QA-Geräte). Die oben beschriebene generische Toolchain wird bereitgestellt; keine SSH-Keys
+oder Deployment-Werkzeuge werden installiert.
 
 Code-Server konsumiert `edge-net`, `ops-net` und zusätzlich das von
 [`infra/dev`](../dev/README.md) verwaltete externe `dev-net`. Keine statische
